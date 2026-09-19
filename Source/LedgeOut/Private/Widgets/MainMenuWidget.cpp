@@ -24,6 +24,7 @@ void UMainMenuWidget::SearchLobby()
 void UMainMenuWidget::HostLobby()
 {
 	UE_LOG(LogTemp, Log, TEXT("Creando lobby..."));
+	
 }
 
 void UMainMenuWidget::ExitGame()

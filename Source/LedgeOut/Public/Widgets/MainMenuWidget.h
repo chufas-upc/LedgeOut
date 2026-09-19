@@ -17,6 +17,8 @@ class LEDGEOUT_API UMainMenuWidget : public UUserWidget
 {
 	GENERATED_BODY()
 	
+	// Binding Widgets
+	
 	UPROPERTY(Category = "Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  SearchLobby_Button;
 	
@@ -29,6 +31,9 @@ class LEDGEOUT_API UMainMenuWidget : public UUserWidget
 	UPROPERTY(Category = "Text", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> Username_TextBlock;
 	
+public:
+	
+private:
 	UFUNCTION()
 	void SearchLobby();
 	

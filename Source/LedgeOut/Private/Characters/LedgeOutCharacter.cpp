@@ -1,6 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
-#include "LedgeOutCharacter.h"
+#include "Characters/LedgeOutCharacter.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -11,6 +9,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "LedgeOut.h"
+#include "Combat/CombatComponent.h"
 
 ALedgeOutCharacter::ALedgeOutCharacter()
 {
@@ -48,6 +47,14 @@ ALedgeOutCharacter::ALedgeOutCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	
+	//Combat Component
+	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+}
+
+void ALedgeOutCharacter::GetDamage_Implementation(FDamageData DamageData)
+{
+	CombatComponent->HandleDamage(DamageData);
 }
 
 void ALedgeOutCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -65,6 +72,9 @@ void ALedgeOutCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ALedgeOutCharacter::Look);
+		
+		// Combat
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ALedgeOutCharacter::Attack);
 	}
 	else
 	{
@@ -88,6 +98,11 @@ void ALedgeOutCharacter::Look(const FInputActionValue& Value)
 
 	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
+}
+
+void ALedgeOutCharacter::Attack(const FInputActionValue& Value)
+{
+	CombatComponent->TryAttack();
 }
 
 void ALedgeOutCharacter::DoMove(float Right, float Forward)
