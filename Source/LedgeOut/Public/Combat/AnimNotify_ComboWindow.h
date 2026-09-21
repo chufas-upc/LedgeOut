@@ -17,4 +17,7 @@ public:
 		const FAnimNotifyEventReference& EventReference) override;
 	virtual void NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
 		const FAnimNotifyEventReference& EventReference) override;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Combo")
+	int32 AttackIndex;
 };

@@ -16,6 +16,6 @@ void UAnimNotifyState_ComboWindow::NotifyEnd(USkeletalMeshComponent* MeshComp, U
 {
 	if (UCombatComponent* CombatComp = MeshComp->GetOwner()->GetComponentByClass<UCombatComponent>(); IsValid(CombatComp))
 	{
-		CombatComp->ClearComboWindow();
+		CombatComp->ClearComboWindow(AttackIndex);
 	}
 }

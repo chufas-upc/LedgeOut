@@ -58,7 +58,7 @@ public:
 	void StartComboWindow();
 	
 	UFUNCTION(BlueprintCallable, Category = "Combat|Animations")
-	void ClearComboWindow();
+	void ClearComboWindow(int32 AttackIndex);
 	
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void HandleDamage(FDamageData DamageData);

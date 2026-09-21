@@ -68,10 +68,14 @@ void UCombatComponent::StartComboWindow()
 	}
 }
 
-void UCombatComponent::ClearComboWindow()
+void UCombatComponent::ClearComboWindow(const int32 AttackIndex)
 {
-	UE_LOG(LogTemp, Log, TEXT("Clearing Combo Window"));
-	bCanAttack = true;
+	if (ComboCounter == AttackIndex + 1)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Clearing Combo Window"));
+		bCanAttack = true;
+		ComboCounter = 0;
+	}
 }
 
 void UCombatComponent::HandleDamage(FDamageData DamageData)
