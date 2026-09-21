@@ -4,6 +4,7 @@
 #include "Public/Widgets/MainMenuWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Kismet/GameplayStatics.h"
 
 void UMainMenuWidget::NativeConstruct()
 {
@@ -14,6 +15,12 @@ void UMainMenuWidget::NativeConstruct()
 	
 	// Retriving Username
 	Username_TextBlock->SetText(FText::FromString(TEXT("Xx_Pablosaurio_xX")));
+	
+	// Setting up Input mode
+	TObjectPtr<APlayerController> PC = GetWorld()->GetFirstPlayerController();
+	const FInputModeUIOnly InputMode;
+	PC->SetInputMode(InputMode);
+	PC->SetShowMouseCursor(true);
 }
 
 void UMainMenuWidget::SearchLobby()
@@ -24,6 +31,7 @@ void UMainMenuWidget::SearchLobby()
 void UMainMenuWidget::HostLobby()
 {
 	UE_LOG(LogTemp, Log, TEXT("Creando lobby..."));
+	UGameplayStatics::OpenLevel(this, FName("L_Game"));
 	
 }
 

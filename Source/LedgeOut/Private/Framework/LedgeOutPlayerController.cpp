@@ -23,5 +23,10 @@ void ALedgeOutPlayerController::SetupInputComponent()
 				Subsystem->AddMappingContext(CurrentContext, 0);
 			}
 		}
+		
+		// Setup GameInput and Cursor
+		SetShowMouseCursor(false);
+		const FInputModeGameOnly InputMode; 
+		SetInputMode(InputMode);
 	}
 }
