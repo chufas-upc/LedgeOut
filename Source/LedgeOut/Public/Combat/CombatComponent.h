@@ -18,7 +18,7 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 	
 	UCombatComponent();
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Replicated, meta = (AllowPrivateAccess = "true"))
 	float Damage = 0.f;
 	
 	UPROPERTY()
@@ -33,7 +33,7 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 	UPROPERTY()
 	bool bCanAttack = true;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Combo")
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Combo", Replicated)
 	int32 ComboCounter = 0;
 	
 	UPROPERTY()
@@ -44,7 +44,8 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 
 public:
 	virtual void BeginPlay() override;
-	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	float BaseKnockback = 0.1f;
 

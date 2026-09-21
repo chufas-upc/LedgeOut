@@ -1,10 +1,12 @@
 ﻿#include "Combat/CombatComponent.h"
 #include "DamageTypes.h"
 #include "Characters/LedgeOutCharacter.h"
+#include "Net/UnrealNetwork.h"
 
 UCombatComponent::UCombatComponent()
 {
 	// Start with tick enabled = false
+	SetIsReplicated(true);
 }
 
 void UCombatComponent::PlayAttackAnimation()
@@ -34,6 +36,13 @@ void UCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	Character = Cast<ALedgeOutCharacter>(GetOwner()); 
+}
+
+void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UCombatComponent, Damage);
+	DOREPLIFETIME(UCombatComponent, ComboCounter);
 }
 
 void UCombatComponent::TryAttack()
@@ -82,6 +91,14 @@ void UCombatComponent::HandleDamage(FDamageData DamageData)
 {
 	Damage += DamageData.Amount;
 	Character->LaunchCharacter(DamageData.KnockbackVector * (BaseKnockback + Damage), true, true);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			5.f,
+			FColor::Yellow,
+			FString::Printf(TEXT("Damage Dealth: %f Current Damage: %f"), DamageData.Amount, Damage));
+	}
 }
 
 void UCombatComponent::RecoverFromDamage()
