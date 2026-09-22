@@ -26,7 +26,7 @@ void UAnimNotify_CastHitBox::Notify(USkeletalMeshComponent* MeshComp, UAnimSeque
 	}
 
 	UWorld* World = MeshComp->GetWorld();
-	if (!World)
+	if (!World && !MeshComp->GetOwner()->HasAuthority())
 	{
 		return;
 	}
