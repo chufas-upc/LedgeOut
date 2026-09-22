@@ -102,7 +102,7 @@ void ALedgeOutCharacter::Look(const FInputActionValue& Value)
 
 void ALedgeOutCharacter::Attack(const FInputActionValue& Value)
 {
-	CombatComponent->TryAttack();
+	CombatComponent->Server_TryAttack();
 }
 
 void ALedgeOutCharacter::DoMove(float Right, float Forward)

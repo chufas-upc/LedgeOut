@@ -39,8 +39,8 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 	UPROPERTY()
 	TObjectPtr<ALedgeOutCharacter> Character;
 	
-	UFUNCTION()
-	void PlayAttackAnimation();
+	UFUNCTION(NetMulticast, Reliable, BlueprintCallable, Category = "Combat|Animations")
+	void NetMulticast_ExecuteAttack();
 	
 	// Networking Replication
 	UFUNCTION()
@@ -56,8 +56,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	float BaseKnockback = 0.1f;
 
-	UFUNCTION(BlueprintCallable, Category = "Combat|Inputs")
-	void TryAttack();
+	UFUNCTION(BlueprintCallable, Server, Reliable ,Category = "Combat|Inputs")
+	void Server_TryAttack();
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Animations")
 	TArray<TObjectPtr<UAnimMontage>> PrimaryComboAnimations;

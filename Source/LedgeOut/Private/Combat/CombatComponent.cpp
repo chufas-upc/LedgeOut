@@ -9,17 +9,9 @@ UCombatComponent::UCombatComponent()
 	SetIsReplicated(true);
 }
 
-void UCombatComponent::PlayAttackAnimation()
+void UCombatComponent::NetMulticast_ExecuteAttack_Implementation()
 {
 	Character->PlayAnimMontage(PrimaryComboAnimations[ComboCounter]);
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(
-			-1,
-			5.f,
-			FColor::Red,
-			FString::Printf(TEXT("Playing attack: %d"), ComboCounter));
-	}
 	
 	bCanAttack = false;
 	bWantsToAttack = false;
@@ -47,10 +39,10 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCombatComponent, Damage);
-	DOREPLIFETIME(UCombatComponent, ComboCounter);
+	DOREPLIFETIME_CONDITION(UCombatComponent, ComboCounter, COND_OwnerOnly);
 }
 
-void UCombatComponent::TryAttack()
+void UCombatComponent::Server_TryAttack_Implementation()
 {
 	UE_LOG(LogTemp, Log, TEXT("TryAttack - bIsAttacking: %s, bCanAttack: %s, ComboCounter: %d"),
 		false ? TEXT("true") : TEXT("false"),
@@ -70,7 +62,7 @@ void UCombatComponent::TryAttack()
 		return;
 	}
 	
-	PlayAttackAnimation();
+	NetMulticast_ExecuteAttack();
 }
 
 void UCombatComponent::StartComboWindow()
@@ -78,7 +70,7 @@ void UCombatComponent::StartComboWindow()
 	bCanAttack = true;
 	if (bWantsToAttack)
 	{
-		TryAttack();
+		Server_TryAttack();
 	}
 }
 
