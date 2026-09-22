@@ -2,6 +2,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
+#include "Widgets/GameWidget.h"
 
 void ALedgeOutPlayerController::BeginPlay()
 {
@@ -28,5 +29,21 @@ void ALedgeOutPlayerController::SetupInputComponent()
 		SetShowMouseCursor(false);
 		const FInputModeGameOnly InputMode; 
 		SetInputMode(InputMode);
+		
+		// Setting up Game Widget
+		GameWidget = CreateWidget<UGameWidget>(this, GameWidgetClass);
+		if (GameWidget)
+		{
+			GameWidget->AddToPlayerScreen();
+		}
+	}
+}
+
+void ALedgeOutPlayerController::AcknowledgePossession(APawn* P)
+{
+	Super::AcknowledgePossession(P);
+	if (GameWidget)
+	{
+		GameWidget->BindPawn(P);
 	}
 }

@@ -32,6 +32,11 @@ void UCombatComponent::PlayAttackAnimation()
 	}
 }
 
+void UCombatComponent::OnRep_Damage()
+{
+	OnDamageChange.Broadcast(Damage);
+}
+
 void UCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -89,6 +94,7 @@ void UCombatComponent::ClearComboWindow(const int32 AttackIndex)
 
 void UCombatComponent::HandleDamage(FDamageData DamageData)
 {
+	if (!GetOwner()->HasAuthority()) return;
 	Damage += DamageData.Amount;
 	Character->LaunchCharacter(DamageData.KnockbackVector * (BaseKnockback + Damage), true, true);
 	if (GEngine)
@@ -99,6 +105,7 @@ void UCombatComponent::HandleDamage(FDamageData DamageData)
 			FColor::Yellow,
 			FString::Printf(TEXT("Damage Dealth: %f Current Damage: %f"), DamageData.Amount, Damage));
 	}
+	OnDamageChange.Broadcast(Damage);
 }
 
 void UCombatComponent::RecoverFromDamage()

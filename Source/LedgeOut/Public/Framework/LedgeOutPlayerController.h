@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "LedgeOutPlayerController.generated.h"
 
+class UGameWidget;
 class UInputMappingContext;
 class UUserWidget;
 
@@ -21,7 +22,7 @@ class ALedgeOutPlayerController : public APlayerController
 protected:
 
 	/** Input Mapping Contexts */
-	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category ="Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
 	/** Gameplay initialization */
@@ -30,4 +31,12 @@ protected:
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
 
+public:
+	virtual void AcknowledgePossession(APawn* P) override;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category ="Widgets")
+	TSubclassOf<UGameWidget> GameWidgetClass;
+	
+	UPROPERTY(BlueprintReadOnly, Category ="Widgets")
+	TObjectPtr<UGameWidget> GameWidget;
 };

@@ -7,7 +7,7 @@
 class ALedgeOutCharacter;
 struct FDamageData;
 
-DECLARE_MULTICAST_DELEGATE_OneParam(F, const FDamageData&);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDamageChange, float, Damage);
 /**
  * 
  */
@@ -18,7 +18,7 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 	
 	UCombatComponent();
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Replicated, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_Damage, meta = (AllowPrivateAccess = "true"))
 	float Damage = 0.f;
 	
 	UPROPERTY()
@@ -41,10 +41,17 @@ class LEDGEOUT_API UCombatComponent : public UActorComponent
 	
 	UFUNCTION()
 	void PlayAttackAnimation();
+	
+	// Networking Replication
+	UFUNCTION()
+	void OnRep_Damage();
 
 public:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	/* Evento al recibir daño */
+	FOnDamageChange OnDamageChange;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	float BaseKnockback = 0.1f;
