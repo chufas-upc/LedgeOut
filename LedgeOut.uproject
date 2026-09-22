@@ -58,6 +58,13 @@
 		{
 			"Name": "WindowsMoviePlayer",
 			"Enabled": false
+		},
+		{
+			"Name": "WinDualShock",
+			"Enabled": true,
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
 		}
 	]
 }
