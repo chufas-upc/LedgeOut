@@ -17,7 +17,7 @@ void ALobbyGameMode::OnPostLogin(AController* NewPlayer)
 {
 	Super::OnPostLogin(NewPlayer);
 	GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, FString::Printf(TEXT("Player logged!")));
-	OnPlayerConnected.Broadcast(NewPlayer->GetPlayerState<ALedgeOutPlayerState>());
+	//OnPlayerConnected.Broadcast(NewPlayer->GetPlayerState<ALedgeOutPlayerState>());
 }
 
 FString ALobbyGameMode::GetCharacterNameByIndex(const int32 Index)

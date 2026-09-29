@@ -16,7 +16,7 @@ ACameraActor* ALobbyPlayerController::FindCameraByTag(const FName Tag) const
 void ALobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	if (!HasAuthority())return;;
 	// Primary Player Only 
 	if (!IsLocalController() || !IsPrimaryPlayer()) return;
 
