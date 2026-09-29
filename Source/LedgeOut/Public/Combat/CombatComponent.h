@@ -54,7 +54,7 @@ public:
 	FOnDamageChange OnDamageChange;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
-	float BaseKnockback = 0.1f;
+	float BaseKnockback = 1.f;
 
 	UFUNCTION(BlueprintCallable, Server, Reliable ,Category = "Combat|Inputs")
 	void Server_TryAttack();

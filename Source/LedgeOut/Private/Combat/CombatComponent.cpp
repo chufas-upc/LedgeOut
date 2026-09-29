@@ -5,8 +5,8 @@
 
 UCombatComponent::UCombatComponent()
 {
-	// Start with tick enabled = false
-	SetIsReplicated(true);
+	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UCombatComponent::NetMulticast_ExecuteAttack_Implementation()
