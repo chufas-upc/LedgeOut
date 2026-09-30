@@ -21,7 +21,7 @@ public class LedgeOut : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "OnlineSubsystemUtils" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"LedgeOut"

@@ -11,6 +11,7 @@ UCLASS()
 class LEDGEOUT_API ALobbyPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+	ALobbyPlayerController();
 
 	ACameraActor* FindCameraByTag(FName Tag) const;
 

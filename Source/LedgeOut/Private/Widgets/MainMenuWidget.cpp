@@ -39,15 +39,18 @@ void UMainMenuWidget::SearchLobby()
 {
 	UE_LOG(LogTemp, Log, TEXT("Buscando lobby..."));
 	
-	FString IP = "127.0.0.1";
-	UGameplayStatics::OpenLevel(this, *IP);
+	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem = UGameplayStatics::GetGameInstance(this)->
+		GetSubsystem<UOnlineSessionsSubsystem>(); IsValid(OnlineSessionsSubsystem))
+	{
+		OnlineSessionsSubsystem->ConnectToServer("127.0.0.1");
+	}
 }
 
 void UMainMenuWidget::HostLobby()
 {
 	UE_LOG(LogTemp, Log, TEXT("Creando lobby..."));
 
-	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem =  UGameplayStatics::GetGameInstance(this)->
+	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem = UGameplayStatics::GetGameInstance(this)->
 		GetSubsystem<UOnlineSessionsSubsystem>(); IsValid(OnlineSessionsSubsystem))
 	{
 		OnlineSessionsSubsystem->HostSession(4, true);

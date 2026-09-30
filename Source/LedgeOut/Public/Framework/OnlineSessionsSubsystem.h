@@ -16,17 +16,28 @@ class LEDGEOUT_API UOnlineSessionsSubsystem : public UGameInstanceSubsystem
 	
 	
 public:
-	UOnlineSessionsSubsystem();
+	virtual void Deinitialize() override;
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void HostSession(int32 MaxPlayers, bool isLan);
+
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
+	void DestroySession();
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
 	void ConnectToServer(FString IPAddr);
 	
 private:
-	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+	IOnlineSessionPtr GetSessionInterface() const;
+	void CreateSessionInternal(int32 MaxPlayers, bool bIsLan);
 
-	IOnlineSessionPtr SessionInterface;
+	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+	void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+
 	FDelegateHandle CreateSessionCompleteDelegateHandle;
+	FDelegateHandle DestroySessionCompleteDelegateHandle;
+
+	bool bCreateSessionOnDestroy = false;
+	int32 PendingMaxPlayers = 4;
+	bool bPendingIsLan = false;
 };

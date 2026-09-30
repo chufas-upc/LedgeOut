@@ -2,22 +2,59 @@
 
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
+#include "Kismet/GameplayStatics.h"
 
-UOnlineSessionsSubsystem::UOnlineSessionsSubsystem()
+IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
 {
-	if (const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get())
+	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+	return Subsystem ? Subsystem->GetSessionInterface() : nullptr;
+}
+
+void UOnlineSessionsSubsystem::Deinitialize()
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (SessionInterface.IsValid())
 	{
-		SessionInterface = Subsystem->GetSessionInterface();
+		if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
+		{
+			SessionInterface->DestroySession(NAME_GameSession);
+		}
 	}
+
+	Super::Deinitialize();
 }
 
 void UOnlineSessionsSubsystem::HostSession(const int32 MaxPlayers, const bool bIsLan)
 {
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (!SessionInterface.IsValid())
 	{
 		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return;
 	}
-	
+
+	FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession);
+	if (ExistingSession != nullptr)
+	{
+		UE_LOG(LogOnline, Log, TEXT("Existing session found. Destroying session before creating a new one..."));
+		bCreateSessionOnDestroy = true;
+		PendingMaxPlayers = MaxPlayers;
+		bPendingIsLan = bIsLan;
+		DestroySession();
+		return;
+	}
+
+	CreateSessionInternal(MaxPlayers, bIsLan);
+}
+
+void UOnlineSessionsSubsystem::CreateSessionInternal(const int32 MaxPlayers, const bool bIsLan)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		return;
+	}
+
 	SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 	
 	CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(
@@ -48,13 +85,40 @@ void UOnlineSessionsSubsystem::HostSession(const int32 MaxPlayers, const bool bI
 	}
 }
 
+void UOnlineSessionsSubsystem::DestroySession()
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return;
+	}
+
+	SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+	DestroySessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(
+		FOnDestroySessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnDestroySessionComplete)
+	);
+
+	if (!SessionInterface->DestroySession(NAME_GameSession))
+	{
+		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+	}
+}
+
 void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr)
 {
-	
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return;
+	}
+	UGameplayStatics::OpenLevel(this, *IPAddr);
 }
 
 void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (SessionInterface.IsValid())
 	{
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
@@ -70,5 +134,20 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 			
 			World->ServerTravel(FString::Printf(TEXT("%s?listen"), *CurrentMapName));
 		}
+	}
+}
+
+void UOnlineSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (SessionInterface.IsValid())
+	{
+		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+	}
+
+	if (bCreateSessionOnDestroy)
+	{
+		bCreateSessionOnDestroy = false;
+		CreateSessionInternal(PendingMaxPlayers, bPendingIsLan);
 	}
 }

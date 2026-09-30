@@ -2,6 +2,11 @@
 #include "Camera/CameraActor.h"
 #include "Kismet/GameplayStatics.h"
 
+ALobbyPlayerController::ALobbyPlayerController()
+{
+	bAutoManageActiveCameraTarget = false;
+}
+
 ACameraActor* ALobbyPlayerController::FindCameraByTag(const FName Tag) const
 {
 	TArray<AActor*> FoundActors;
@@ -16,7 +21,7 @@ ACameraActor* ALobbyPlayerController::FindCameraByTag(const FName Tag) const
 void ALobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!HasAuthority())return;;
+	// if (!HasAuthority()) return;
 	// Primary Player Only 
 	if (!IsLocalController() || !IsPrimaryPlayer()) return;
 
