@@ -1,9 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Public/Widgets/MainMenuWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/CheckBox.h"
 #include "Framework/OnlineSessionsSubsystem.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
@@ -42,7 +43,13 @@ void UMainMenuWidget::SearchLobby()
 	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem = UGameplayStatics::GetGameInstance(this)->
 		GetSubsystem<UOnlineSessionsSubsystem>(); IsValid(OnlineSessionsSubsystem))
 	{
-		OnlineSessionsSubsystem->ConnectToServer("127.0.0.1");
+		bool bIsLan = false;
+		if (const ECheckBoxState LanState = CheckBox_IsLan->GetCheckedState(); LanState == ECheckBoxState::Checked)
+		{
+			bIsLan = true;
+		}
+		
+		OnlineSessionsSubsystem->SearchSessions(0, bIsLan);
 	}
 }
 
@@ -53,7 +60,13 @@ void UMainMenuWidget::HostLobby()
 	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem = UGameplayStatics::GetGameInstance(this)->
 		GetSubsystem<UOnlineSessionsSubsystem>(); IsValid(OnlineSessionsSubsystem))
 	{
-		OnlineSessionsSubsystem->HostSession(4, true);
+		bool bIsLan = false;
+		if (const ECheckBoxState LanState = CheckBox_IsLan->GetCheckedState(); LanState == ECheckBoxState::Checked)
+		{
+			bIsLan = true;
+		}
+		
+		OnlineSessionsSubsystem->HostSession(4, bIsLan);
 	}
 }
 

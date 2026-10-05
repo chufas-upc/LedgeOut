@@ -2,7 +2,10 @@
 
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
-#include "Kismet/GameplayStatics.h"
+#include "FindSessionsCallbackProxy.h"
+#include "OnlineBeaconHost.h"
+#include "Framework/LobbyBeaconHostObject.h"
+#include "Framework/LobbyBeaconClient.h"
 
 IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
 {
@@ -12,6 +15,19 @@ IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
 
 void UOnlineSessionsSubsystem::Deinitialize()
 {
+	if (BeaconClient)
+	{
+		BeaconClient->DestroyBeacon();
+		BeaconClient = nullptr;
+	}
+
+	if (BeaconHost)
+	{
+		BeaconHost->DestroyBeacon();
+		BeaconHost = nullptr;
+		LobbyHostObject = nullptr;
+	}
+
 	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (SessionInterface.IsValid())
 	{
@@ -45,6 +61,28 @@ void UOnlineSessionsSubsystem::HostSession(const int32 MaxPlayers, const bool bI
 	}
 
 	CreateSessionInternal(MaxPlayers, bIsLan);
+}
+
+bool UOnlineSessionsSubsystem::SearchSessions(const int32 SearchingPlayerNum, const bool bIsLanQuery)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return false;
+	}
+	
+	SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+	
+	FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(
+		FOnFindSessionsCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::FindSessionsComplete));
+	
+	SessionSearch = MakeShared<FOnlineSessionSearch>();
+
+	SessionSearch->bIsLanQuery = bIsLanQuery;
+	SessionSearch->MaxSearchResults = 10;
+	
+	return SessionInterface->FindSessions(SearchingPlayerNum, SessionSearch.ToSharedRef());
 }
 
 void UOnlineSessionsSubsystem::CreateSessionInternal(const int32 MaxPlayers, const bool bIsLan)
@@ -85,8 +123,87 @@ void UOnlineSessionsSubsystem::CreateSessionInternal(const int32 MaxPlayers, con
 	}
 }
 
+void UOnlineSessionsSubsystem::FindSessionsComplete(bool bWasSuccessful)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (SessionInterface.IsValid())
+	{
+		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+	}
+
+	if (!bWasSuccessful || !SessionSearch.IsValid())
+	{
+		UE_LOG(LogOnline, Warning, TEXT("FindSessions failed or SessionSearch is invalid"));
+		return;
+	}
+
+	if (SessionSearch->SearchResults.Num() > 0)
+	{
+		UE_LOG(LogOnline, Log, TEXT("Subsystem found %d sessions"), SessionSearch->SearchResults.Num());
+
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+		JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(
+			FOnJoinSessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnJoinSessionComplete)
+		);
+
+		SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[0]);
+	}
+	else
+	{
+		UE_LOG(LogOnline, Log, TEXT("No sessions found"));
+	}
+}
+
+void UOnlineSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (SessionInterface.IsValid())
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+
+		if (Result == EOnJoinSessionCompleteResult::Success || Result == EOnJoinSessionCompleteResult::AlreadyInSession)
+		{
+			FString ConnectString;
+			if (SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
+			{
+				FString HostIP = ConnectString;
+				int32 PortIndex = -1;
+				if (HostIP.FindChar(':', PortIndex))
+				{
+					HostIP = HostIP.Left(PortIndex);
+				}
+
+				if (HostIP.IsEmpty() || HostIP == TEXT("0.0.0.0"))
+				{
+					HostIP = TEXT("127.0.0.1");
+				}
+
+				UE_LOG(LogOnline, Warning, TEXT("Joined session successfully. Connecting BeaconClient to Host IP: %s:15000..."), *HostIP);
+				ConnectToServer(HostIP, 15000);
+			}
+		}
+		else
+		{
+			UE_LOG(LogOnline, Warning, TEXT("Failed to join session: %s"), *SessionName.ToString());
+		}
+	}
+}
+
 void UOnlineSessionsSubsystem::DestroySession()
 {
+	if (BeaconClient)
+	{
+		BeaconClient->DestroyBeacon();
+		BeaconClient = nullptr;
+	}
+
+	if (BeaconHost)
+	{
+		BeaconHost->DestroyBeacon();
+		BeaconHost = nullptr;
+		LobbyHostObject = nullptr;
+	}
+
 	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (!SessionInterface.IsValid())
 	{
@@ -105,15 +222,42 @@ void UOnlineSessionsSubsystem::DestroySession()
 	}
 }
 
-void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr)
+void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 {
-	IOnlineSessionPtr SessionInterface = GetSessionInterface();
-	if (!SessionInterface.IsValid())
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	if (IPAddr.IsEmpty())
 	{
-		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
-		return;
+		IPAddr = TEXT("127.0.0.1");
 	}
-	UGameplayStatics::OpenLevel(this, *IPAddr);
+
+	if (BeaconClient)
+	{
+		BeaconClient->DestroyBeacon();
+		BeaconClient = nullptr;
+	}
+
+	BeaconClient = World->SpawnActor<ALobbyBeaconClient>(ALobbyBeaconClient::StaticClass());
+	if (BeaconClient)
+	{
+		FURL Destination(nullptr, *IPAddr, TRAVEL_Absolute);
+		Destination.Port = Port;
+		UE_LOG(LogOnline, Warning, TEXT("BeaconClient connecting to %s:%d..."), *IPAddr, Destination.Port);
+		
+		if (!BeaconClient->InitClient(Destination))
+		{
+			UE_LOG(LogOnline, Error, TEXT("BeaconClient InitClient FAILED to initialize net driver for destination %s:%d!"), *IPAddr, Destination.Port);
+		}
+		else
+		{
+			UE_LOG(LogOnline, Warning, TEXT("BeaconClient InitClient returned true, waiting for connection..."));
+		}
+	}
+	else
+	{
+		UE_LOG(LogOnline, Error, TEXT("Failed to spawn ALobbyBeaconClient actor!"));
+	}
 }
 
 void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -124,15 +268,44 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 	}
 
-	if (bWasSuccessful)
+	if (!bWasSuccessful)
 	{
-		UWorld* World = GetWorld();
-		if (World)
+		UE_LOG(LogOnline, Warning, TEXT("Failed to create session"));
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (BeaconHost)
 		{
-			FString CurrentMapName = World->GetMapName();
-			CurrentMapName.RemoveFromStart(World->StreamingLevelsPrefix);
-			
-			World->ServerTravel(FString::Printf(TEXT("%s?listen"), *CurrentMapName));
+			BeaconHost->DestroyBeacon();
+			BeaconHost = nullptr;
+		}
+
+		BeaconHost = World->SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass());
+		if (BeaconHost)
+		{
+			BeaconHost->ListenPort = 15000;
+			if (BeaconHost->InitHost())
+			{
+				BeaconHost->PauseBeaconRequests(false);
+				UE_LOG(LogOnline, Warning, TEXT("BeaconHost InitHost SUCCEEDED listening on port %d"), BeaconHost->GetListenPort());
+
+				LobbyHostObject = World->SpawnActor<ALobbyBeaconHostObject>(ALobbyBeaconHostObject::StaticClass());
+				if (LobbyHostObject)
+				{
+					BeaconHost->RegisterHost(LobbyHostObject);
+					UE_LOG(LogOnline, Warning, TEXT("Online Beacon Host registered ALobbyBeaconHostObject successfully!"));
+				}
+				else
+				{
+					UE_LOG(LogOnline, Error, TEXT("Failed to spawn ALobbyBeaconHostObject actor!"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogOnline, Error, TEXT("Failed to initialize Online Beacon Host!"));
+			}
 		}
 	}
 }
@@ -150,4 +323,45 @@ void UOnlineSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool 
 		bCreateSessionOnDestroy = false;
 		CreateSessionInternal(PendingMaxPlayers, bPendingIsLan);
 	}
+}
+
+void UOnlineSessionsSubsystem::ClientTravel(APlayerController* PC, FString URL, ETravelType TravelTipe, bool bIsSeamless)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return;
+	}
+	
+	PC->ClientTravel(URL, TravelTipe, bIsSeamless);
+}
+
+void UOnlineSessionsSubsystem::ServerTravel(FString URL, bool bIsAbsolute)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogOnline, Error, TEXT("World is not valid"));
+		return;
+	}
+	
+	World->ServerTravel(URL, bIsAbsolute);
+}
+
+bool UOnlineSessionsSubsystem::JoinSession(int32 LocalUserNum, FName SessionName, const FBlueprintSessionResult& SearchResult)
+{
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Session Interface is not valid"));
+		return false;
+	}
+	
+	SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+	JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(
+		FOnJoinSessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnJoinSessionComplete)
+	);
+
+	return SessionInterface->JoinSession(LocalUserNum, SessionName, SearchResult.OnlineResult);
 }

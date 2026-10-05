@@ -8,6 +8,7 @@
 
 class UButton;
 class UTextBlock;
+class UCheckBox;
 
 /**
  * 
@@ -30,6 +31,9 @@ class LEDGEOUT_API UMainMenuWidget : public UUserWidget
 	
 	UPROPERTY(Category = "Text", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> Username_TextBlock;
+	
+	UPROPERTY(Category = "CheckBox", EditDefaultsOnly, meta = (BindWidget))
+	TObjectPtr<UCheckBox> CheckBox_IsLan;
 	
 public:
 	
