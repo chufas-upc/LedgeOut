@@ -29,7 +29,7 @@ public:
 	void BroadcastLobbyState();
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
-	void StartGameForLobby(const FString& MapURL);
+	void StartGameForLobby(const FString& MapAddress, const FString& URL);
 
 private:
 	TMap<ALobbyBeaconClient*, TArray<FLobbyPlayerData>> ConnectedPlayersMap;

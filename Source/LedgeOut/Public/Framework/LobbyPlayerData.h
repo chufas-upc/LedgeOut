@@ -20,3 +20,11 @@ struct FLobbyPlayerData
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
 	bool bIsReady = false;
 };
+
+UENUM(BlueprintType)
+enum class ELobbyStatus: uint8
+{
+	Disconnected,
+	Host,
+	Client
+};

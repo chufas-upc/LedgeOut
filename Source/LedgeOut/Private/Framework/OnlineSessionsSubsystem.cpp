@@ -4,6 +4,7 @@
 #include "OnlineSessionSettings.h"
 #include "FindSessionsCallbackProxy.h"
 #include "OnlineBeaconHost.h"
+#include "OnlineSubsystemUtils.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
 
@@ -103,10 +104,11 @@ void UOnlineSessionsSubsystem::CreateSessionInternal(const int32 MaxPlayers, con
 	FOnlineSessionSettings SessionSettings;
 	SessionSettings.bIsLANMatch = bIsLan;
 	SessionSettings.NumPublicConnections = MaxPlayers;
-	SessionSettings.bAllowJoinInProgress = false;
+	SessionSettings.bAllowJoinInProgress = true;
 	SessionSettings.bShouldAdvertise = true;
 	SessionSettings.bUsesPresence = true;
 	SessionSettings.bAllowJoinViaPresence = true;
+	SessionSettings.bUseLobbiesIfAvailable = true;
 
 	const ULocalPlayer* LocalPlayer = GetWorld() ? GetWorld()->GetFirstLocalPlayerFromController() : nullptr;
 	const FUniqueNetIdRepl NetId = LocalPlayer ? LocalPlayer->GetPreferredUniqueNetId() : FUniqueNetIdRepl();
@@ -146,6 +148,7 @@ void UOnlineSessionsSubsystem::FindSessionsComplete(bool bWasSuccessful)
 			FOnJoinSessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnJoinSessionComplete)
 		);
 
+		// Temp: Unirse a la primera sesión encontrada
 		SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[0]);
 	}
 	else
@@ -163,6 +166,8 @@ void UOnlineSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 		if (Result == EOnJoinSessionCompleteResult::Success || Result == EOnJoinSessionCompleteResult::AlreadyInSession)
 		{
+			OnConnectionChanged.Broadcast(ELobbyStatus::Client);
+			
 			FString ConnectString;
 			if (SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 			{
@@ -251,13 +256,30 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 		}
 		else
 		{
-			UE_LOG(LogOnline, Warning, TEXT("BeaconClient InitClient returned true, waiting for connection..."));
+			UE_LOG(LogOnline, Log, TEXT("BeaconClient InitClient returned true, waiting for connection..."));
 		}
 	}
 	else
 	{
 		UE_LOG(LogOnline, Error, TEXT("Failed to spawn ALobbyBeaconClient actor!"));
 	}
+}
+
+void UOnlineSessionsSubsystem::StartGameLevel(const FString MapAddress)
+{
+	// Por defecto devuelve <IP>:0
+	FString URL;
+	GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);
+		
+	FString IP, Port;
+	URL.Split(":", &IP, &Port);
+		
+		
+	// Solución de puerto Hardcodeada
+	const FString GameplayPort = ":7777";
+	URL = IP + GameplayPort;
+		
+	LobbyHostObject->StartGameForLobby(MapAddress, URL);
 }
 
 void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -273,6 +295,8 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 		UE_LOG(LogOnline, Warning, TEXT("Failed to create session"));
 		return;
 	}
+	
+	OnConnectionChanged.Broadcast(ELobbyStatus::Host);
 
 	if (UWorld* World = GetWorld())
 	{
@@ -289,13 +313,13 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 			if (BeaconHost->InitHost())
 			{
 				BeaconHost->PauseBeaconRequests(false);
-				UE_LOG(LogOnline, Warning, TEXT("BeaconHost InitHost SUCCEEDED listening on port %d"), BeaconHost->GetListenPort());
+				UE_LOG(LogOnline, Log, TEXT("BeaconHost InitHost SUCCEEDED listening on port %d"), BeaconHost->GetListenPort());
 
 				LobbyHostObject = World->SpawnActor<ALobbyBeaconHostObject>(ALobbyBeaconHostObject::StaticClass());
 				if (LobbyHostObject)
 				{
 					BeaconHost->RegisterHost(LobbyHostObject);
-					UE_LOG(LogOnline, Warning, TEXT("Online Beacon Host registered ALobbyBeaconHostObject successfully!"));
+					UE_LOG(LogOnline, Log, TEXT("Online Beacon Host registered ALobbyBeaconHostObject successfully!"));
 				}
 				else
 				{
@@ -317,6 +341,8 @@ void UOnlineSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool 
 	{
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
 	}
+	
+	OnConnectionChanged.Broadcast(ELobbyStatus::Disconnected);
 
 	if (bCreateSessionOnDestroy)
 	{
@@ -337,16 +363,35 @@ void UOnlineSessionsSubsystem::ClientTravel(APlayerController* PC, FString URL, 
 	PC->ClientTravel(URL, TravelTipe, bIsSeamless);
 }
 
-void UOnlineSessionsSubsystem::ServerTravel(FString URL, bool bIsAbsolute)
+void UOnlineSessionsSubsystem::ServerTravel(FString Map, bool bIsAbsolute)
 {
-	UWorld* World = GetWorld();
-	if (!World)
+	if (!bIsAbsolute && !IsValid(LobbyHostObject))
 	{
-		UE_LOG(LogOnline, Error, TEXT("World is not valid"));
+		UE_LOG(LogOnline, Error, TEXT("LobbyHostObject is not valid"));
 		return;
 	}
 	
-	World->ServerTravel(URL, bIsAbsolute);
+	if (bIsAbsolute)
+	{
+		GetWorld()->ServerTravel(Map, true);
+	}
+	else
+	{
+		
+		// Por defecto devuelve <IP>:0
+		FString URL;
+		GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);
+		
+		FString IP, Port;
+		URL.Split(":", &IP, &Port);
+		
+		
+		// Solución de puerto Hardcodeada
+		const FString GameplayPort = ":7777";
+		URL = IP + GameplayPort;
+		
+		LobbyHostObject->StartGameForLobby(Map, URL);
+	}
 }
 
 bool UOnlineSessionsSubsystem::JoinSession(int32 LocalUserNum, FName SessionName, const FBlueprintSessionResult& SearchResult)
@@ -364,4 +409,149 @@ bool UOnlineSessionsSubsystem::JoinSession(int32 LocalUserNum, FName SessionName
 	);
 
 	return SessionInterface->JoinSession(LocalUserNum, SessionName, SearchResult.OnlineResult);
+	
+}
+
+void UOnlineSessionsSubsystem::ForceCreateHostBeacon()
+{
+	OnCreateSessionComplete(NAME_GameSession, true);
+}
+
+void UOnlineSessionsSubsystem::DebugPrintCurrentSession() const
+{
+    IOnlineSessionPtr SessionInterface = GetSessionInterface();
+
+    if (!SessionInterface.IsValid())
+    {
+        UE_LOG(LogOnline, Error, TEXT("========== SESSION DEBUG =========="));
+        UE_LOG(LogOnline, Error, TEXT("SessionInterface is INVALID"));
+        UE_LOG(LogOnline, Error, TEXT("==================================="));
+        return;
+    }
+
+    const FNamedOnlineSession* NamedSession =
+        SessionInterface->GetNamedSession(NAME_GameSession);
+
+    UE_LOG(LogOnline, Log, TEXT(""));
+    UE_LOG(LogOnline, Log, TEXT("========== SESSION DEBUG =========="));
+
+    if (!NamedSession)
+    {
+        UE_LOG(LogOnline, Log, TEXT("No named session found"));
+
+        UE_LOG(LogOnline, Log, TEXT("==================================="));
+        return;
+    }
+
+	const FOnlineSession& Session = *NamedSession;
+
+    UE_LOG(LogOnline, Log, TEXT("Session Name: %s"),
+        *NamedSession->SessionName.ToString());
+
+    UE_LOG(LogOnline, Log, TEXT("Session State: %d"),
+        static_cast<int32>(NamedSession->SessionState));
+
+    UE_LOG(LogOnline, Log, TEXT("Num Public Connections: %d"),
+        Session.SessionSettings.NumPublicConnections);
+
+    UE_LOG(LogOnline, Log, TEXT("Num Private Connections: %d"),
+        Session.SessionSettings.NumPrivateConnections);
+
+    UE_LOG(LogOnline, Log, TEXT("Num Open Public Connections: %d"),
+        Session.NumOpenPublicConnections);
+
+    UE_LOG(LogOnline, Log, TEXT("Num Open Private Connections: %d"),
+        Session.NumOpenPrivateConnections);
+
+    UE_LOG(LogOnline, Log, TEXT("bIsLANMatch: %s"),
+        Session.SessionSettings.bIsLANMatch ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bShouldAdvertise: %s"),
+        Session.SessionSettings.bShouldAdvertise ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bAllowJoinInProgress: %s"),
+        Session.SessionSettings.bAllowJoinInProgress ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bAllowJoinViaPresence: %s"),
+        Session.SessionSettings.bAllowJoinViaPresence ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bAllowJoinViaPresenceFriendsOnly: %s"),
+        Session.SessionSettings.bAllowJoinViaPresenceFriendsOnly ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bUsesPresence: %s"),
+        Session.SessionSettings.bUsesPresence ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bUsesStats: %s"),
+        Session.SessionSettings.bUsesStats ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bIsDedicated: %s"),
+        Session.SessionSettings.bIsDedicated ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bUseLobbiesIfAvailable: %s"),
+        Session.SessionSettings.bUseLobbiesIfAvailable ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bUseLobbiesVoiceChatIfAvailable: %s"),
+        Session.SessionSettings.bUseLobbiesVoiceChatIfAvailable ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("bAntiCheatProtected: %s"),
+        Session.SessionSettings.bAntiCheatProtected ? TEXT("true") : TEXT("false"));
+
+    UE_LOG(LogOnline, Log, TEXT("Advertisement Type: %d"),
+        static_cast<int32>(Session.SessionSettings.bShouldAdvertise));
+
+    UE_LOG(LogOnline, Log, TEXT(""));
+    UE_LOG(LogOnline, Log, TEXT("--- Custom Session Settings ---"));
+
+    for (const TPair<FName, FOnlineSessionSetting>& Setting :
+         Session.SessionSettings.Settings)
+    {
+        FString ValueString;
+
+        Setting.Value.Data.GetValue(ValueString);
+
+        UE_LOG(
+            LogOnline,
+            Log,
+            TEXT("  [%s] = %s | AdvertisementType=%d | ID=%d"),
+            *Setting.Key.ToString(),
+            *ValueString,
+            static_cast<int32>(Setting.Value.AdvertisementType),
+            Setting.Value.ID
+        );
+    }
+
+    UE_LOG(LogOnline, Log, TEXT(""));
+    UE_LOG(LogOnline, Log, TEXT("--- Registered Players ---"));
+
+    // for (const TSharedRef<const FUniqueNetId>& Player :
+    //      Session.RegisteredPlayers)
+    // {
+    //     UE_LOG(
+    //         LogOnline,
+    //         Log,
+    //         TEXT("  Player: %s"),
+    //         *Player->ToString()
+    //     );
+    // }
+	
+	IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld());
+
+	if (OSS)
+	{
+		UE_LOG(
+			LogOnline,
+			Log,
+			TEXT("[SESSION] OSS = %s"),
+			*OSS->GetSubsystemName().ToString()
+		);
+	}
+	else
+	{
+		UE_LOG(LogOnline, Warning, TEXT("No OSS"));
+	}
+
+    UE_LOG(LogOnline, Log, TEXT("==================================="));
+    UE_LOG(LogOnline, Log, TEXT(""));
+	
+	SessionInterface->DumpSessionState();
 }

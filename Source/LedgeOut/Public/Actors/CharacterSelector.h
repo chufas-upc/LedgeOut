@@ -1,9 +1,11 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Framework/LobbyPlayerData.h"
 #include "GameFramework/Actor.h"
 #include "CharacterSelector.generated.h"
 
+struct FLobbyPlayerData;
 class ALedgeOutPlayerState;
 class ALobbyPlayerController;
 
@@ -27,8 +29,8 @@ class LEDGEOUT_API ACharacterSelector : public AActor
 public:
 	ACharacterSelector();
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	TObjectPtr<ALobbyPlayerController> BoundPlayerController;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	FLobbyPlayerData PLayerData;
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly)
 	int32 SelectorIndex = 0;

@@ -13,6 +13,12 @@ APlayerController* ALobbyGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRo
 	return Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
 }
 
+void ALobbyGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+	GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("Player logged out!")));
+}
+
 void ALobbyGameMode::OnPostLogin(AController* NewPlayer)
 {
 	Super::OnPostLogin(NewPlayer);

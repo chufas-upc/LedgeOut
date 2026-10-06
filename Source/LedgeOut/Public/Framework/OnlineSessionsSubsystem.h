@@ -12,12 +12,18 @@ class AOnlineBeaconHost;
 class ALobbyBeaconHostObject;
 class ALobbyBeaconClient;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FConnectionChange, ELobbyStatus, SessionType);
+
 UCLASS()
 class LEDGEOUT_API UOnlineSessionsSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 	
 public:
+	
+	UPROPERTY(BlueprintAssignable)
+	FConnectionChange OnConnectionChanged;
+	
 	virtual void Deinitialize() override;
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
@@ -29,8 +35,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void DestroySession();
 	
-	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void ConnectToServer(FString IPAddr, int32 Port = 15000);
+	
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
+	void StartGameLevel(FString MapAddress);
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "Online|Beacons")
 	TObjectPtr<AOnlineBeaconHost> BeaconHost;
@@ -62,11 +71,17 @@ private:
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
-	void ClientTravel(APlayerController* PC, FString URL, ETravelType TravelTipe, bool bIsSeamless);
+	void ClientTravel(APlayerController* PC, FString URL, ETravelType TravelType, bool bIsSeamless);
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
-	void ServerTravel(FString URL, bool bIsAbsolute);
+	void ServerTravel(FString Map, bool bIsAbsolute);
 
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
 	bool JoinSession(int32 LocalUserNum, FName SessionName, const FBlueprintSessionResult& SearchResult);
+	
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
+	void ForceCreateHostBeacon();
+	
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
+	void DebugPrintCurrentSession() const;
 };

@@ -104,4 +104,6 @@ void ALobbyBeaconClient::ClientGameStarting_Implementation(const FString& Connec
 	{
 		PC->ClientTravel(ConnectURL, ETravelType::TRAVEL_Absolute);
 	}
+	
+	DestroyBeacon();
 }
