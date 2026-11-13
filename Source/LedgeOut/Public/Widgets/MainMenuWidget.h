@@ -20,39 +20,43 @@ class LEDGEOUT_API UMainMenuWidget : public UUserWidget
 {
 	GENERATED_BODY()
 	
+protected:
 	// Binding Widgets
 	
 	/* General */
 	
-	UPROPERTY(Category = "General|Text", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "General|Text", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> Username_TextBlock;
 		
-	UPROPERTY(EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UWidgetSwitcher> WidgetSwitcher_Container;
 	
 	/* Main Menu */
 	
-	UPROPERTY(Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  SearchLobby_Button;
 	
-	UPROPERTY(Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  CreateLobby_Button;
 	
-	UPROPERTY(Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Menu|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  ExitGame_Button;
 	
-	UPROPERTY(Category = "Menu|CheckBox", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Menu|CheckBox", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UCheckBox> CheckBox_IsLan;
 	
 	/* Lobby */
 	
-	UPROPERTY(Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  StartMatch_Button;
 	
-	UPROPERTY(Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  ReadyLobby_Button;
 	
-	UPROPERTY(Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Lobby|Text", EditDefaultsOnly, meta = (BindWidget))
+	TObjectPtr<UTextBlock> ReadyLobby_TextBlock;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Lobby|Buttons", EditDefaultsOnly, meta = (BindWidget))
 	TObjectPtr<UButton>  ExitLobby_Button;
 
 public:
@@ -79,17 +83,30 @@ private:
 	
 	/* Lobby Managing */
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void StartMatch();
 	
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
+	void ToggleReady();
+	
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void SetReady(bool bIsReady);
 	
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Lobby")
 	void LeaveLobby();
+
+	UPROPERTY()
+	bool bIsLocalReady = false;
+
+protected:
+	/** Can be implemented or overridden in Blueprints to update button visuals (colors, text, animations) */
+	UFUNCTION(BlueprintNativeEvent, Category = "Lobby")
+	void OnReadyStateChanged(bool bNewReady);
+	virtual void OnReadyStateChanged_Implementation(bool bNewReady);
 	
 	
 
 protected:
+	UFUNCTION()
 	virtual void NativeConstruct() override;
 };

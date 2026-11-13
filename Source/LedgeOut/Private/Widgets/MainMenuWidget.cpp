@@ -1,6 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Public/Widgets/MainMenuWidget.h"
 
 #include "Components/Button.h"
@@ -8,6 +5,7 @@
 #include "Components/CheckBox.h"
 #include "Components/WidgetSwitcher.h"
 #include "Framework/OnlineSessionsSubsystem.h"
+#include "Framework/LobbyBeaconClient.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -28,6 +26,7 @@ void UMainMenuWidget::NativeConstruct()
 	
 	// Lobby
 	StartMatch_Button->OnClicked.AddDynamic(this, &UMainMenuWidget::StartMatch);
+	ReadyLobby_Button->OnClicked.AddDynamic(this, &UMainMenuWidget::ToggleReady);
 	
 	// Retriving Username
 	if (IsValid(GetOwningPlayerState()))
@@ -69,6 +68,7 @@ void UMainMenuWidget::ConnectionStatusChanged(const ELobbyStatus Status)
 	
 	if (Status == ELobbyStatus::Disconnected)
 	{
+		SetReady(false);
 		WidgetSwitcher_Container->SetActiveWidgetIndex(MenuWidgetIndex);
 		return;
 	}
@@ -76,6 +76,7 @@ void UMainMenuWidget::ConnectionStatusChanged(const ELobbyStatus Status)
 	WidgetSwitcher_Container->SetActiveWidgetIndex(LobbyWidgetIndex);
 	if (Status == ELobbyStatus::Client)
 	{
+		SetReady(false);
 		StartMatch_Button->SetVisibility(ESlateVisibility::Collapsed);
 		ReadyLobby_Button->SetVisibility(ESlateVisibility::Visible);
 	}
@@ -135,8 +136,35 @@ void UMainMenuWidget::StartMatch()
 	}
 }
 
+void UMainMenuWidget::ToggleReady()
+{
+	SetReady(!bIsLocalReady);
+}
+
 void UMainMenuWidget::SetReady(bool bIsReady)
 {
+	bIsLocalReady = bIsReady;
+
+	if (UOnlineSessionsSubsystem* OnlineSessionsSubsystem = UGameplayStatics::GetGameInstance(this)->
+		GetSubsystem<UOnlineSessionsSubsystem>(); IsValid(OnlineSessionsSubsystem))
+	{
+		if (IsValid(OnlineSessionsSubsystem->BeaconClient))
+		{
+			OnlineSessionsSubsystem->BeaconClient->SetAllLocalPlayersReady(bIsLocalReady);
+		}
+	}
+
+	OnReadyStateChanged(bIsLocalReady);
+}
+
+void UMainMenuWidget::OnReadyStateChanged_Implementation(bool bNewReady)
+{
+	const FText ReadyText = bNewReady ? FText::FromString(TEXT("¡Todo Listo!")) : FText::FromString(TEXT("Preparandose..."));
+
+	if (ReadyLobby_TextBlock)
+	{
+		ReadyLobby_TextBlock->SetText(ReadyText);
+	}
 }
 
 void UMainMenuWidget::LeaveLobby()

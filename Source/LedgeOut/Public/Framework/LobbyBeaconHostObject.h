@@ -25,6 +25,22 @@ public:
 
 	void UpdateClientLocalPlayers(ALobbyBeaconClient* Client, const TArray<FLobbyPlayerData>& LocalPlayers);
 
+	// --- Host Local Player Management (e.g. splitscreen / host player 0) ---
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
+	void SetHostLocalPlayers(const TArray<FLobbyPlayerData>& NewHostPlayers);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
+	void AddHostLocalPlayer(const FLobbyPlayerData& NewPlayerData);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
+	void RemoveHostLocalPlayer(int32 LocalPlayerIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
+	void UpdateHostLocalPlayerData(int32 LocalPlayerIndex, const FLobbyPlayerData& NewData);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
+	TArray<FLobbyPlayerData> GetHostLocalPlayers() const { return HostLocalPlayers; }
+
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
 	void BroadcastLobbyState();
 
@@ -32,5 +48,8 @@ public:
 	void StartGameForLobby(const FString& MapAddress, const FString& URL);
 
 private:
+	UPROPERTY()
+	TArray<FLobbyPlayerData> HostLocalPlayers;
+
 	TMap<ALobbyBeaconClient*, TArray<FLobbyPlayerData>> ConnectedPlayersMap;
 };

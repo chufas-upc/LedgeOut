@@ -29,14 +29,26 @@ class LEDGEOUT_API ACharacterSelector : public AActor
 public:
 	ACharacterSelector();
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite)
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Lobby")
 	FLobbyPlayerData PLayerData;
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadOnly)
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Lobby")
 	int32 SelectorIndex = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Lobby")
+	bool bIsOccupied = false;
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UFUNCTION()
+	void OnLobbyPlayersUpdated(const TArray<FLobbyPlayerData>& PlayerList);
+
+	/** Called when a player occupies or leaves this slot. Can be overridden in Blueprints. */
+	UFUNCTION(BlueprintNativeEvent, Category = "Lobby")
+	void OnSlotOccupiedStateChanged(bool bOccupied, const FLobbyPlayerData& OccupyingPlayerData);
+	virtual void OnSlotOccupiedStateChanged_Implementation(bool bOccupied, const FLobbyPlayerData& OccupyingPlayerData);
 
 public:
 	UFUNCTION(BlueprintCallable)

@@ -46,15 +46,62 @@ void ALobbyBeaconHostObject::UpdateClientLocalPlayers(ALobbyBeaconClient* Client
 	}
 }
 
+void ALobbyBeaconHostObject::SetHostLocalPlayers(const TArray<FLobbyPlayerData>& NewHostPlayers)
+{
+	HostLocalPlayers = NewHostPlayers;
+	BroadcastLobbyState();
+}
+
+void ALobbyBeaconHostObject::AddHostLocalPlayer(const FLobbyPlayerData& NewPlayerData)
+{
+	HostLocalPlayers.Add(NewPlayerData);
+	BroadcastLobbyState();
+}
+
+void ALobbyBeaconHostObject::RemoveHostLocalPlayer(int32 LocalPlayerIndex)
+{
+	HostLocalPlayers.RemoveAll([LocalPlayerIndex](const FLobbyPlayerData& Data)
+	{
+		return Data.LocalPlayerIndex == LocalPlayerIndex;
+	});
+	BroadcastLobbyState();
+}
+
+void ALobbyBeaconHostObject::UpdateHostLocalPlayerData(int32 LocalPlayerIndex, const FLobbyPlayerData& NewData)
+{
+	bool bFound = false;
+	for (FLobbyPlayerData& Data : HostLocalPlayers)
+	{
+		if (Data.LocalPlayerIndex == LocalPlayerIndex)
+		{
+			Data = NewData;
+			bFound = true;
+			break;
+		}
+	}
+
+	if (!bFound)
+	{
+		HostLocalPlayers.Add(NewData);
+	}
+
+	BroadcastLobbyState();
+}
+
 void ALobbyBeaconHostObject::BroadcastLobbyState()
 {
 	TArray<FLobbyPlayerData> FullPlayerList;
 
+	// 1. Include the host's local players
+	FullPlayerList.Append(HostLocalPlayers);
+
+	// 2. Include all connected client players
 	for (const auto& Pair : ConnectedPlayersMap)
 	{
 		FullPlayerList.Append(Pair.Value);
 	}
 
+	// 3. Replicate update to all connected clients
 	for (const auto& Pair : ConnectedPlayersMap)
 	{
 		if (Pair.Key)
@@ -63,6 +110,7 @@ void ALobbyBeaconHostObject::BroadcastLobbyState()
 		}
 	}
 
+	// 4. Notify local host listeners/UI
 	OnHostLobbyUpdated.Broadcast(FullPlayerList);
 }
 

@@ -7,23 +7,31 @@
 #include "OnlineSubsystemUtils.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
+#include "GameFramework/PlayerState.h"
 
 IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
 {
-	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+	const IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
 	return Subsystem ? Subsystem->GetSessionInterface() : nullptr;
 }
 
 void UOnlineSessionsSubsystem::Deinitialize()
 {
+	CachedLobbyPlayers.Empty();
+
 	if (BeaconClient)
 	{
+		BeaconClient->OnLobbyUpdated.RemoveAll(this);
 		BeaconClient->DestroyBeacon();
 		BeaconClient = nullptr;
 	}
 
 	if (BeaconHost)
 	{
+		if (LobbyHostObject)
+		{
+			LobbyHostObject->OnHostLobbyUpdated.RemoveAll(this);
+		}
 		BeaconHost->DestroyBeacon();
 		BeaconHost = nullptr;
 		LobbyHostObject = nullptr;
@@ -183,7 +191,7 @@ void UOnlineSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 					HostIP = TEXT("127.0.0.1");
 				}
 
-				UE_LOG(LogOnline, Warning, TEXT("Joined session successfully. Connecting BeaconClient to Host IP: %s:15000..."), *HostIP);
+				UE_LOG(LogOnline, Log, TEXT("Joined session successfully. Connecting BeaconClient to Host IP: %s:15000..."), *HostIP);
 				ConnectToServer(HostIP, 15000);
 			}
 		}
@@ -246,6 +254,8 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 	BeaconClient = World->SpawnActor<ALobbyBeaconClient>(ALobbyBeaconClient::StaticClass());
 	if (BeaconClient)
 	{
+		BeaconClient->OnLobbyUpdated.AddDynamic(this, &UOnlineSessionsSubsystem::HandleLobbyUpdated);
+
 		FURL Destination(nullptr, *IPAddr, TRAVEL_Absolute);
 		Destination.Port = Port;
 		UE_LOG(LogOnline, Warning, TEXT("BeaconClient connecting to %s:%d..."), *IPAddr, Destination.Port);
@@ -318,8 +328,25 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 				LobbyHostObject = World->SpawnActor<ALobbyBeaconHostObject>(ALobbyBeaconHostObject::StaticClass());
 				if (LobbyHostObject)
 				{
+					LobbyHostObject->OnHostLobbyUpdated.AddDynamic(this, &UOnlineSessionsSubsystem::HandleLobbyUpdated);
 					BeaconHost->RegisterHost(LobbyHostObject);
 					UE_LOG(LogOnline, Log, TEXT("Online Beacon Host registered ALobbyBeaconHostObject successfully!"));
+
+					// Register host's initial local player
+					FLobbyPlayerData HostP1;
+					HostP1.PlayerName = TEXT("Host_Player");
+					if (APlayerController* PC = World->GetFirstPlayerController())
+					{
+						if (APlayerState* PS = PC->PlayerState)
+						{
+							HostP1.PlayerName = PS->GetPlayerName();
+						}
+					}
+					HostP1.LocalPlayerIndex = 0;
+					HostP1.SelectedCharacterIndex = 0;
+					HostP1.bIsReady = true;
+
+					LobbyHostObject->AddHostLocalPlayer(HostP1);
 				}
 				else
 				{
@@ -336,6 +363,9 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 
 void UOnlineSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	CachedLobbyPlayers.Empty();
+	OnLobbyPlayersUpdated.Broadcast(CachedLobbyPlayers);
+
 	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (SessionInterface.IsValid())
 	{
@@ -554,4 +584,10 @@ void UOnlineSessionsSubsystem::DebugPrintCurrentSession() const
     UE_LOG(LogOnline, Log, TEXT(""));
 	
 	SessionInterface->DumpSessionState();
+}
+
+void UOnlineSessionsSubsystem::HandleLobbyUpdated(const TArray<FLobbyPlayerData>& PlayerList)
+{
+	CachedLobbyPlayers = PlayerList;
+	OnLobbyPlayersUpdated.Broadcast(CachedLobbyPlayers);
 }

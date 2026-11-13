@@ -13,6 +13,7 @@ class ALobbyBeaconHostObject;
 class ALobbyBeaconClient;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FConnectionChange, ELobbyStatus, SessionType);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSubsystemLobbyUpdated, const TArray<FLobbyPlayerData>&, PlayerList);
 
 UCLASS()
 class LEDGEOUT_API UOnlineSessionsSubsystem : public UGameInstanceSubsystem
@@ -21,8 +22,11 @@ class LEDGEOUT_API UOnlineSessionsSubsystem : public UGameInstanceSubsystem
 	
 public:
 	
-	UPROPERTY(BlueprintAssignable)
+	UPROPERTY(BlueprintAssignable, Category = "Online|Sessions")
 	FConnectionChange OnConnectionChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Online|Sessions")
+	FOnSubsystemLobbyUpdated OnLobbyPlayersUpdated;
 	
 	virtual void Deinitialize() override;
 	
@@ -84,4 +88,14 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions|Test")
 	void DebugPrintCurrentSession() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
+	TArray<FLobbyPlayerData> GetCurrentLobbyPlayers() const { return CachedLobbyPlayers; }
+
+private:
+	UFUNCTION()
+	void HandleLobbyUpdated(const TArray<FLobbyPlayerData>& PlayerList);
+
+	UPROPERTY()
+	TArray<FLobbyPlayerData> CachedLobbyPlayers;
 };

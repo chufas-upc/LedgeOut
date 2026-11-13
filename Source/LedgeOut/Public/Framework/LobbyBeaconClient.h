@@ -34,6 +34,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
 	void RemoveLocalPlayer(int32 LocalPlayerIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	TArray<FLobbyPlayerData> GetLocalPlayers() const { return MyLocalPlayers; }
+
+	// Set ready state for all local players on this machine and notify the host
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void SetAllLocalPlayersReady(bool bIsReady);
+
+	// Toggle ready state for all local players on this machine and notify the host
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void ToggleAllLocalPlayersReady();
+
 	// Send current local players array to host
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
 	void SendLocalPlayersToHost();

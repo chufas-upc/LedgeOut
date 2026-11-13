@@ -2,6 +2,7 @@
 #include "Framework/LobbyBeaconHostObject.h"
 #include "GameFramework/PlayerController.h"
 #include "OnlineSubsystem.h"
+#include "GameFramework/PlayerState.h"
 
 ALobbyBeaconClient::ALobbyBeaconClient()
 {
@@ -22,6 +23,16 @@ void ALobbyBeaconClient::OnConnected()
 	{
 		FLobbyPlayerData DefaultP1;
 		DefaultP1.PlayerName = TEXT("Player_1");
+		if (UWorld* World = GetWorld())
+		{
+			if (APlayerController* PC = World->GetFirstPlayerController())
+			{
+				if (APlayerState* PS = PC->PlayerState)
+				{
+					DefaultP1.PlayerName = PS->GetPlayerName();
+				}
+			}
+		}
 		DefaultP1.LocalPlayerIndex = 0;
 		DefaultP1.SelectedCharacterIndex = 0;
 		DefaultP1.bIsReady = false;
@@ -75,6 +86,30 @@ void ALobbyBeaconClient::UpdateLocalPlayerData(int32 LocalPlayerIndex, const FLo
 	}
 
 	SendLocalPlayersToHost();
+}
+
+void ALobbyBeaconClient::SetAllLocalPlayersReady(bool bIsReady)
+{
+	for (FLobbyPlayerData& Data : MyLocalPlayers)
+	{
+		Data.bIsReady = bIsReady;
+	}
+	SendLocalPlayersToHost();
+}
+
+void ALobbyBeaconClient::ToggleAllLocalPlayersReady()
+{
+	bool bAnyNotReady = false;
+	for (const FLobbyPlayerData& Data : MyLocalPlayers)
+	{
+		if (!Data.bIsReady)
+		{
+			bAnyNotReady = true;
+			break;
+		}
+	}
+
+	SetAllLocalPlayersReady(bAnyNotReady);
 }
 
 void ALobbyBeaconClient::SendLocalPlayersToHost()
