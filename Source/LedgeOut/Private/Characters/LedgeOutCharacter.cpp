@@ -10,6 +10,8 @@
 #include "InputActionValue.h"
 #include "LedgeOut.h"
 #include "Combat/CombatComponent.h"
+#include "Engine/AssetManager.h"
+#include "Net/UnrealNetwork.h"
 
 ALedgeOutCharacter::ALedgeOutCharacter()
 {
@@ -55,6 +57,70 @@ ALedgeOutCharacter::ALedgeOutCharacter()
 void ALedgeOutCharacter::GetDamage_Implementation(FDamageData DamageData)
 {
 	CombatComponent->HandleDamage(DamageData);
+}
+
+void ALedgeOutCharacter::SetLobbySkinMeshPath(const FString& MeshPath)
+{
+	if (LobbySkinMeshPath == MeshPath)
+	{
+		return;
+	}
+
+	LobbySkinMeshPath = MeshPath;
+	ApplyLobbySkinMesh();
+}
+
+void ALedgeOutCharacter::OnRep_LobbySkinMeshPath()
+{
+	ApplyLobbySkinMesh();
+}
+
+void ALedgeOutCharacter::ApplyLobbySkinMesh()
+{
+	if (LobbySkinMeshLoadHandle.IsValid())
+	{
+		LobbySkinMeshLoadHandle->CancelHandle();
+		LobbySkinMeshLoadHandle.Reset();
+	}
+
+	if (LobbySkinMeshPath.IsEmpty())
+	{
+		return;
+	}
+
+	const TSoftObjectPtr<USkeletalMesh> SoftMesh{FSoftObjectPath(LobbySkinMeshPath)};
+	if (USkeletalMesh* LoadedMesh = SoftMesh.Get())
+	{
+		GetMesh()->SetSkeletalMesh(LoadedMesh);
+		return;
+	}
+
+	LobbySkinMeshLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		SoftMesh.ToSoftObjectPath(),
+		FStreamableDelegate::CreateUObject(this, &ALedgeOutCharacter::OnLobbySkinMeshLoaded, SoftMesh));
+}
+
+void ALedgeOutCharacter::OnLobbySkinMeshLoaded(TSoftObjectPtr<USkeletalMesh> SoftMesh)
+{
+	if (SoftMesh.ToSoftObjectPath().ToString() != LobbySkinMeshPath)
+	{
+		return;
+	}
+
+	if (USkeletalMesh* LoadedMesh = SoftMesh.Get())
+	{
+		GetMesh()->SetSkeletalMesh(LoadedMesh);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to load selected lobby skin mesh '%s'."), *LobbySkinMeshPath);
+	}
+}
+
+void ALedgeOutCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ALedgeOutCharacter, LobbySkinMeshPath);
 }
 
 void ALedgeOutCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

@@ -12,6 +12,9 @@ struct FLobbyPlayerData
 	FString PlayerName;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
+	FString PlayerUniqueId;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
 	int32 LocalPlayerIndex = 0;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
@@ -23,6 +26,9 @@ struct FLobbyPlayerData
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
 	FString SelectedCharacterMeshPath;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
+	FString SelectedCharacterClassPath;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lobby")
 	FString SelectedSkinMeshPath;

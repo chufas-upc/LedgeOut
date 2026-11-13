@@ -1,5 +1,6 @@
 #include "Framework/LobbyBeaconClient.h"
 #include "Framework/LobbyBeaconHostObject.h"
+#include "Framework/LedgeOutGameInstance.h"
 #include "Framework/Lobby/LobbyGameMode.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -41,6 +42,11 @@ void ALobbyBeaconClient::OnConnected()
 				if (APlayerState* PS = PC->PlayerState)
 				{
 					DefaultP1.PlayerName = PS->GetPlayerName();
+					const FUniqueNetIdRepl& UniqueId = PS->GetUniqueId();
+					if (UniqueId.GetUniqueNetId().IsValid())
+					{
+						DefaultP1.PlayerUniqueId = UniqueId.GetUniqueNetId()->ToString();
+					}
 				}
 			}
 		}
@@ -282,8 +288,18 @@ void ALobbyBeaconClient::ClientUpdateLobbyList_Implementation(const TArray<FLobb
 	OnLobbyUpdated.Broadcast(PlayerList);
 }
 
-void ALobbyBeaconClient::ClientGameStarting_Implementation(const FString& ConnectURL)
+void ALobbyBeaconClient::ClientGameStarting_Implementation(
+	const FString& ConnectURL, const TArray<FLobbyPlayerData>& FinalLobbySelections)
 {
+	if (ULedgeOutGameInstance* GameInstance = Cast<ULedgeOutGameInstance>(GetGameInstance()))
+	{
+		GameInstance->FinalLobbySelections = FinalLobbySelections;
+	}
+	else
+	{
+		UE_LOG(LogOnline, Error, TEXT("Cannot save lobby selections before travel: LedgeOutGameInstance is not configured."));
+	}
+
 	OnLobbyGameStarting.Broadcast(ConnectURL);
 
 	if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)

@@ -1,5 +1,6 @@
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
+#include "Framework/LedgeOutGameInstance.h"
 #include "Framework/Lobby/LobbyGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "OnlineSubsystem.h"
@@ -101,10 +102,16 @@ void ALobbyBeaconHostObject::BroadcastLobbyState()
 		{
 			Player.SelectedCharacterMeshPath.Reset();
 			Player.SelectedSkinMeshPath.Reset();
+			Player.SelectedCharacterClassPath.Reset();
 			if (IsValid(LobbyGameMode))
 			{
 				Player.SelectedCharacterMeshPath = LobbyGameMode->GetCharacterMeshSoft(
 					Player.SelectedCharacterIndex).ToSoftObjectPath().ToString();
+				Player.SelectedCharacterClassPath = LobbyGameMode->AvailableCharacters.IsValidIndex(
+					Player.SelectedCharacterIndex)
+					? LobbyGameMode->AvailableCharacters[Player.SelectedCharacterIndex].CharacterClass
+						.ToSoftObjectPath().ToString()
+					: FString();
 				Player.SelectedSkinMeshPath = LobbyGameMode->GetSkinMeshSoft(
 					Player.SelectedCharacterIndex, Player.SelectedSkinIndex).ToSoftObjectPath().ToString();
 			}
@@ -133,10 +140,16 @@ void ALobbyBeaconHostObject::BroadcastLobbyState()
 			{
 				Player.SelectedCharacterMeshPath.Reset();
 				Player.SelectedSkinMeshPath.Reset();
+				Player.SelectedCharacterClassPath.Reset();
 				if (IsValid(LobbyGameMode))
 				{
 					Player.SelectedCharacterMeshPath = LobbyGameMode->GetCharacterMeshSoft(
 						Player.SelectedCharacterIndex).ToSoftObjectPath().ToString();
+					Player.SelectedCharacterClassPath = LobbyGameMode->AvailableCharacters.IsValidIndex(
+						Player.SelectedCharacterIndex)
+						? LobbyGameMode->AvailableCharacters[Player.SelectedCharacterIndex].CharacterClass
+							.ToSoftObjectPath().ToString()
+						: FString();
 					Player.SelectedSkinMeshPath = LobbyGameMode->GetSkinMeshSoft(
 						Player.SelectedCharacterIndex, Player.SelectedSkinIndex).ToSoftObjectPath().ToString();
 				}
@@ -149,15 +162,26 @@ void ALobbyBeaconHostObject::BroadcastLobbyState()
 	OnHostLobbyUpdated.Broadcast(FullPlayerList);
 }
 
-void ALobbyBeaconHostObject::StartGameForLobby(const FString& MapAddress, const FString& URL)
+void ALobbyBeaconHostObject::StartGameForLobby(
+	const FString& MapAddress, const FString& URL, const TArray<FLobbyPlayerData>& FinalLobbySelections)
 {
 	UE_LOG(LogBeacon, Log, TEXT("Connected Players num: %d"), ConnectedPlayersMap.Num());
 	UE_LOG(LogBeacon, Log, TEXT("Connecting to : %s"), *URL);
+
+	if (ULedgeOutGameInstance* GameInstance = Cast<ULedgeOutGameInstance>(GetGameInstance()))
+	{
+		GameInstance->FinalLobbySelections = FinalLobbySelections;
+	}
+	else
+	{
+		UE_LOG(LogBeacon, Error, TEXT("Cannot save lobby selections before server travel: LedgeOutGameInstance is not configured."));
+	}
+
 	for (const auto& Pair : ConnectedPlayersMap)
 	{
 		if (Pair.Key)
 		{
-			Pair.Key->ClientGameStarting(URL);
+			Pair.Key->ClientGameStarting(URL, FinalLobbySelections);
 		}
 	}
 

@@ -6,12 +6,14 @@
 #include "GameFramework/Character.h"
 #include "Interfaces/Damageable.h"
 #include "Logging/LogMacros.h"
+#include "Engine/StreamableManager.h"
 #include "LedgeOutCharacter.generated.h"
 
 class UCombatComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class USkeletalMesh;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -63,10 +65,24 @@ public:
 
 	/** Constructor */
 	ALedgeOutCharacter();	
+
+	void SetLobbySkinMeshPath(const FString& MeshPath);
 	
 	virtual void GetDamage_Implementation(FDamageData DamageData) override;
 
 protected:
+	UPROPERTY(ReplicatedUsing = OnRep_LobbySkinMeshPath)
+	FString LobbySkinMeshPath;
+
+	UFUNCTION()
+	void OnRep_LobbySkinMeshPath();
+
+	void ApplyLobbySkinMesh();
+	void OnLobbySkinMeshLoaded(TSoftObjectPtr<USkeletalMesh> SoftMesh);
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	TSharedPtr<FStreamableHandle> LobbySkinMeshLoadHandle;
 
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

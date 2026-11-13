@@ -45,7 +45,7 @@ public:
 	void BroadcastLobbyState();
 
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon Host")
-	void StartGameForLobby(const FString& MapAddress, const FString& URL);
+	void StartGameForLobby(const FString& MapAddress, const FString& URL, const TArray<FLobbyPlayerData>& FinalLobbySelections);
 
 private:
 	UPROPERTY()

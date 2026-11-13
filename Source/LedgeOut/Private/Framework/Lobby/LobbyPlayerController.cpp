@@ -120,6 +120,11 @@ void ALobbyPlayerController::ChangeCharacter(const int32 CharacterIndex, const i
 			if (PlayerState)
 			{
 				NewPlayerData.PlayerName = PlayerState->GetPlayerName();
+				const FUniqueNetIdRepl& UniqueId = PlayerState->GetUniqueId();
+				if (UniqueId.GetUniqueNetId().IsValid())
+				{
+					NewPlayerData.PlayerUniqueId = UniqueId.GetUniqueNetId()->ToString();
+				}
 			}
 			LobbyHostObject->UpdateHostLocalPlayerData(LocalPlayerIndex, NewPlayerData);
 			return;

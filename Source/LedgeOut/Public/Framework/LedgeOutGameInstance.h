@@ -15,11 +15,7 @@ class LEDGEOUT_API ULedgeOutGameInstance : public UGameInstance
 	GENERATED_BODY()
 
 public:
-	/**
-	 * Final player selections written by the host just before server travel.
-	 * Available on every machine (host writes it, clients receive it via travel URL or
-	 * you can replicate it through the game state after loading the game map).
-	 */
+	/** Final player selections written on the host and sent to clients before travel. */
 	UPROPERTY(BlueprintReadWrite, Category = "Lobby")
 	TArray<FLobbyPlayerData> FinalLobbySelections;
 

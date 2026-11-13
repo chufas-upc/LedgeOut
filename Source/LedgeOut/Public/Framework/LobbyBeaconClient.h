@@ -73,7 +73,7 @@ public:
 	void ClientUpdateLocalPlayers(const TArray<FLobbyPlayerData>& LocalPlayers);
 
 	UFUNCTION(Client, Reliable)
-	void ClientGameStarting(const FString& ConnectURL);
+	void ClientGameStarting(const FString& ConnectURL, const TArray<FLobbyPlayerData>& FinalLobbySelections);
 
 	virtual void OnConnected() override;
 	virtual void OnFailure() override;

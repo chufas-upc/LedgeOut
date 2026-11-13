@@ -6,6 +6,7 @@
 #include "LobbyGameMode.generated.h"
 
 class ALedgeOutPlayerState;
+class ALedgeOutCharacter;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerConnected, ALedgeOutPlayerState*, PS);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerDisconnected, ALedgeOutPlayerState*, PS);
 
@@ -22,7 +23,7 @@ struct FCharacterSkinDefinition
 	TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
 };
 
-/** Defines a selectable character entry — name + soft reference to its skeletal mesh */
+/** Defines a selectable character entry with a pawn class, preview mesh, and optional alternate skins. */
 USTRUCT(BlueprintType)
 struct FCharacterDefinition
 {
@@ -34,6 +35,10 @@ struct FCharacterDefinition
 	/** Soft ref so heavy meshes are NOT loaded until explicitly requested */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character")
 	TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
+
+	/** Character Blueprint class to spawn for this selection. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character")
+	TSoftClassPtr<ALedgeOutCharacter> CharacterClass;
 
 	/** Optional alternate skeletal meshes selectable as skins for this character. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character")

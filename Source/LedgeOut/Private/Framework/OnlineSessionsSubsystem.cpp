@@ -7,7 +7,6 @@
 #include "OnlineSubsystemUtils.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
-#include "Framework/LedgeOutGameInstance.h"
 #include "GameFramework/PlayerState.h"
 
 IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
@@ -278,13 +277,6 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 
 void UOnlineSessionsSubsystem::StartGameLevel(const FString MapAddress)
 {
-	// Store final lobby selections into the GameInstance before travelling
-	if (ULedgeOutGameInstance* GI = Cast<ULedgeOutGameInstance>(GetGameInstance()))
-	{
-		GI->FinalLobbySelections = CachedLobbyPlayers;
-		UE_LOG(LogOnline, Log, TEXT("StartGameLevel: Saved %d player selections to GameInstance."), CachedLobbyPlayers.Num());
-	}
-
 	// Por defecto devuelve <IP>:0
 	FString URL;
 	GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);
@@ -297,7 +289,7 @@ void UOnlineSessionsSubsystem::StartGameLevel(const FString MapAddress)
 	const FString GameplayPort = ":7777";
 	URL = IP + GameplayPort;
 		
-	LobbyHostObject->StartGameForLobby(MapAddress, URL);
+	LobbyHostObject->StartGameForLobby(MapAddress, URL, CachedLobbyPlayers);
 }
 
 void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -348,6 +340,11 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 						if (APlayerState* PS = PC->PlayerState)
 						{
 							HostP1.PlayerName = PS->GetPlayerName();
+							const FUniqueNetIdRepl& UniqueId = PS->GetUniqueId();
+							if (UniqueId.GetUniqueNetId().IsValid())
+							{
+								HostP1.PlayerUniqueId = UniqueId.GetUniqueNetId()->ToString();
+							}
 						}
 					}
 					HostP1.LocalPlayerIndex = 0;
@@ -428,7 +425,7 @@ void UOnlineSessionsSubsystem::ServerTravel(FString Map, bool bIsAbsolute)
 		const FString GameplayPort = ":7777";
 		URL = IP + GameplayPort;
 		
-		LobbyHostObject->StartGameForLobby(Map, URL);
+		LobbyHostObject->StartGameForLobby(Map, URL, CachedLobbyPlayers);
 	}
 }
 
