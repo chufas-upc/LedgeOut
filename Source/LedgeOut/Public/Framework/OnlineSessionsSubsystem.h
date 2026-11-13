@@ -38,6 +38,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void DestroySession();
+
+	void ResetAfterRound();
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void ConnectToServer(FString IPAddr, int32 Port = 15000);

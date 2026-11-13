@@ -235,6 +235,16 @@ void UOnlineSessionsSubsystem::DestroySession()
 	}
 }
 
+void UOnlineSessionsSubsystem::ResetAfterRound()
+{
+	bCreateSessionOnDestroy = false;
+	DestroySession();
+
+	CachedLobbyPlayers.Empty();
+	OnLobbyPlayersUpdated.Broadcast(CachedLobbyPlayers);
+	OnConnectionChanged.Broadcast(ELobbyStatus::Disconnected);
+}
+
 void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 {
 	UWorld* World = GetWorld();

@@ -1,7 +1,9 @@
 #include "Framework/LedgeOutPlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Framework/LedgeOutGameInstance.h"
 #include "Framework/LedgeOutPlayerState.h"
+#include "Framework/OnlineSessionsSubsystem.h"
 #include "InputMappingContext.h"
 #include "Widgets/GameWidget.h"
 
@@ -61,5 +63,33 @@ void ALedgeOutPlayerController::BindGameWidgetToPlayerState()
 	if (GameWidget)
 	{
 		GameWidget->BindPlayerState(GetPlayerState<ALedgeOutPlayerState>());
+	}
+}
+
+void ALedgeOutPlayerController::ClientShowVictoryMessage_Implementation(const FString& WinnerName)
+{
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+
+	if (GameWidget)
+	{
+		GameWidget->ShowVictoryMessage(WinnerName);
+	}
+}
+
+void ALedgeOutPlayerController::ClientDisconnectAfterRound_Implementation()
+{
+	if (ULedgeOutGameInstance* GameInstance = Cast<ULedgeOutGameInstance>(GetGameInstance()))
+	{
+		GameInstance->ClearLobbySelections();
+		if (UOnlineSessionsSubsystem* Sessions = GameInstance->GetSubsystem<UOnlineSessionsSubsystem>())
+		{
+			Sessions->ResetAfterRound();
+		}
+	}
+
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		GameInstance->ReturnToMainMenu();
 	}
 }

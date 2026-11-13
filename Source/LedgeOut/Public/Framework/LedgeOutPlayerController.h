@@ -41,6 +41,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category ="Widgets")
 	TObjectPtr<UGameWidget> GameWidget;
 
+	UFUNCTION(Client, Reliable)
+	void ClientShowVictoryMessage(const FString& WinnerName);
+
+	UFUNCTION(Client, Reliable)
+	void ClientDisconnectAfterRound();
+
 private:
 	void BindGameWidgetToPlayerState();
 };

@@ -17,6 +17,8 @@ void UMainMenuWidget::NativeConstruct()
 	{
 		OnlineSessionsSubsystem->OnConnectionChanged.AddDynamic(this, &UMainMenuWidget::ConnectionStatusChanged);
 	}
+
+	ConnectionStatusChanged(ELobbyStatus::Disconnected);
 	
 	// Bind Buttons to functions
 	// Main Menu

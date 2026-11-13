@@ -1,8 +1,11 @@
 #include "Framework/LedgeOutGameMode.h"
 #include "Characters/LedgeOutCharacter.h"
 #include "Framework/LedgeOutGameInstance.h"
+#include "Framework/LedgeOutGameState.h"
+#include "Framework/LedgeOutPlayerController.h"
 #include "Framework/LedgeOutPlayerState.h"
 #include "Framework/LobbyPlayerData.h"
+#include "Framework/OnlineSessionsSubsystem.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -14,6 +17,28 @@
 ALedgeOutGameMode::ALedgeOutGameMode()
 {
 	PlayerStateClass = ALedgeOutPlayerState::StaticClass();
+	GameStateClass = ALedgeOutGameState::StaticClass();
+}
+
+void ALedgeOutGameMode::StartPlay()
+{
+	Super::StartPlay();
+
+	RemainingRoundSeconds = FMath::Max(0, RoundDurationSeconds);
+	bIsSuddenDeath = RemainingRoundSeconds == 0;
+	SuddenDeathSeconds = 0;
+
+	if (ALedgeOutGameState* RoundGameState = GetGameState<ALedgeOutGameState>())
+	{
+		RoundGameState->SetRoundTimer(RemainingRoundSeconds, bIsSuddenDeath);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot start round timer: LedgeOutGameState is not configured."));
+	}
+
+	GetWorldTimerManager().SetTimer(
+		RoundTimerHandle, this, &ALedgeOutGameMode::UpdateRoundTimer, 1.0f, true);
 }
 
 const FLobbyPlayerData* ALedgeOutGameMode::FindLobbySelectionForController(const AController* Controller) const
@@ -166,6 +191,12 @@ void ALedgeOutGameMode::HandlePawnDestroyed(AActor* DestroyedActor)
 		PlayerState->HandleDead();
 	}
 
+	CheckForWinner();
+	if (bRoundEnded)
+	{
+		return;
+	}
+
 	if (PlayerState->Lives > 0)
 	{
 		GetWorldTimerManager().SetTimerForNextTick(
@@ -200,6 +231,7 @@ void ALedgeOutGameMode::RespawnPlayer(AController* Controller)
 	{
 		PlayerState->bIsDead = false;
 		PlayerState->ForceNetUpdate();
+		CheckForWinner();
 		return;
 	}
 
@@ -240,6 +272,187 @@ void ALedgeOutGameMode::SpectateRemainingPlayers(APlayerController* SpectatorCon
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("No remaining player pawn is available to spectate."));
+}
+
+void ALedgeOutGameMode::UpdateRoundTimer()
+{
+	if (bRoundEnded)
+	{
+		GetWorldTimerManager().ClearTimer(RoundTimerHandle);
+		return;
+	}
+
+	if (!bIsSuddenDeath)
+	{
+		RemainingRoundSeconds = FMath::Max(0, RemainingRoundSeconds - 1);
+		if (RemainingRoundSeconds == 0)
+		{
+			bIsSuddenDeath = true;
+			SuddenDeathSeconds = 0;
+		}
+	}
+	else
+	{
+		++SuddenDeathSeconds;
+	}
+
+	if (ALedgeOutGameState* RoundGameState = GetGameState<ALedgeOutGameState>())
+	{
+		RoundGameState->SetRoundTimer(
+			bIsSuddenDeath ? SuddenDeathSeconds : RemainingRoundSeconds,
+			bIsSuddenDeath);
+	}
+}
+
+void ALedgeOutGameMode::CheckForWinner()
+{
+	if (bRoundEnded)
+	{
+		return;
+	}
+
+	ALedgeOutGameState* RoundGameState = GetGameState<ALedgeOutGameState>();
+	if (!IsValid(RoundGameState))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot check round winner: LedgeOutGameState is invalid."));
+		return;
+	}
+
+	int32 PlayerCount = 0;
+	ALedgeOutPlayerState* LastPlayerWithLives = nullptr;
+	for (APlayerState* BasePlayerState : RoundGameState->PlayerArray)
+	{
+		ALedgeOutPlayerState* PlayerState = Cast<ALedgeOutPlayerState>(BasePlayerState);
+		if (!IsValid(PlayerState))
+		{
+			continue;
+		}
+
+		++PlayerCount;
+		if (PlayerState->Lives > 0)
+		{
+			if (LastPlayerWithLives)
+			{
+				return;
+			}
+			LastPlayerWithLives = PlayerState;
+		}
+	}
+
+	if (PlayerCount < 2 || !IsValid(LastPlayerWithLives) || LastPlayerWithLives->bIsDead)
+	{
+		return;
+	}
+
+	AController* WinnerController = nullptr;
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (IsValid(PlayerController)
+				&& PlayerController->GetPlayerState<ALedgeOutPlayerState>() == LastPlayerWithLives)
+			{
+				WinnerController = PlayerController;
+				break;
+			}
+		}
+	}
+
+	if (!IsValid(WinnerController) || !IsValid(WinnerController->GetPawn()))
+	{
+		return;
+	}
+
+	EndRound(LastPlayerWithLives);
+}
+
+void ALedgeOutGameMode::EndRound(ALedgeOutPlayerState* Winner)
+{
+	if (bRoundEnded || !IsValid(Winner))
+	{
+		return;
+	}
+
+	bRoundEnded = true;
+	GetWorldTimerManager().ClearTimer(RoundTimerHandle);
+
+	const FString WinnerName = Winner->GetPlayerName();
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (ALedgeOutPlayerController* PlayerController = Cast<ALedgeOutPlayerController>(It->Get()))
+			{
+				PlayerController->SetIgnoreMoveInput(true);
+				PlayerController->SetIgnoreLookInput(true);
+				PlayerController->ClientShowVictoryMessage(WinnerName);
+			}
+		}
+	}
+
+	GetWorldTimerManager().SetTimer(
+		ReturnToMenuTimerHandle, this, &ALedgeOutGameMode::ReturnToMenu,
+		FMath::Max(0.1f, VictoryMessageDurationSeconds), false);
+}
+
+void ALedgeOutGameMode::ReturnToMenu()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (MenuMapPath.IsEmpty())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Cannot return to menu: MenuMapPath is empty."));
+			return;
+		}
+
+		if (ULedgeOutGameInstance* GameInstance = Cast<ULedgeOutGameInstance>(GetGameInstance()))
+		{
+			GameInstance->ClearLobbySelections();
+			if (UOnlineSessionsSubsystem* Sessions = GameInstance->GetSubsystem<UOnlineSessionsSubsystem>())
+			{
+				Sessions->ResetAfterRound();
+			}
+		}
+
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (IsValid(PlayerController) && !PlayerController->IsLocalController())
+			{
+				if (ALedgeOutPlayerController* LedgeOutController = Cast<ALedgeOutPlayerController>(PlayerController))
+				{
+					LedgeOutController->ClientDisconnectAfterRound();
+				}
+				else
+				{
+					PlayerController->ClientReturnToMainMenuWithTextReason(FText::GetEmpty());
+				}
+			}
+		}
+
+		GetWorldTimerManager().SetTimer(
+			ReturnToMenuTimerHandle, this, &ALedgeOutGameMode::TravelHostToMenu, 1.0f, false);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot return to menu: world is invalid."));
+	}
+}
+
+void ALedgeOutGameMode::TravelHostToMenu()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (!World->ServerTravel(MenuMapPath, true))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to travel back to menu map '%s'."), *MenuMapPath);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cannot travel to menu: world is invalid."));
+	}
 }
 
 void ALedgeOutGameMode::ApplyLobbySkinToPawn(APawn* Pawn, const AController* Controller) const
