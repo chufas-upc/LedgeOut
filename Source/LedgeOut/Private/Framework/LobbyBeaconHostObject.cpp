@@ -166,7 +166,7 @@ void ALobbyBeaconHostObject::StartGameForLobby(
 	const FString& MapAddress, const FString& URL, const TArray<FLobbyPlayerData>& FinalLobbySelections)
 {
 	UE_LOG(LogBeacon, Log, TEXT("Connected Players num: %d"), ConnectedPlayersMap.Num());
-	UE_LOG(LogBeacon, Log, TEXT("Connecting to : %s"), *URL);
+	UE_LOG(LogBeacon, Log, TEXT("Sending clients the resolved match connection address."));
 
 	if (ULedgeOutGameInstance* GameInstance = Cast<ULedgeOutGameInstance>(GetGameInstance()))
 	{

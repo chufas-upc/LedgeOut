@@ -11,6 +11,7 @@
 class AOnlineBeaconHost;
 class ALobbyBeaconHostObject;
 class ALobbyBeaconClient;
+class APlayerState;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FConnectionChange, ELobbyStatus, SessionType);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSubsystemLobbyUpdated, const TArray<FLobbyPlayerData>&, PlayerList);
@@ -28,7 +29,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Online|Sessions")
 	FOnSubsystemLobbyUpdated OnLobbyPlayersUpdated;
 	
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+
+	static FString GetPlayerDisplayName(const APlayerState* PlayerState);
 	
 	UFUNCTION(BlueprintCallable, Category = "Online|Sessions")
 	void HostSession(int32 MaxPlayers, bool isLan);
@@ -64,11 +68,18 @@ private:
 	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
 	void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+	void OnSessionUserInviteAccepted(
+		bool bWasSuccessful,
+		int32 LocalUserNum,
+		TSharedPtr<const FUniqueNetId> UserId,
+		const FOnlineSessionSearchResult& InviteResult);
+	bool JoinSessionInternal(int32 LocalUserNum, FName SessionName, const FOnlineSessionSearchResult& SearchResult);
 
 	FDelegateHandle CreateSessionCompleteDelegateHandle;
 	FDelegateHandle FindSessionsCompleteDelegateHandle;
 	FDelegateHandle JoinSessionCompleteDelegateHandle;
 	FDelegateHandle DestroySessionCompleteDelegateHandle;
+	FDelegateHandle SessionUserInviteAcceptedDelegateHandle;
 
 	bool bCreateSessionOnDestroy = false;
 	int32 PendingMaxPlayers = 4;

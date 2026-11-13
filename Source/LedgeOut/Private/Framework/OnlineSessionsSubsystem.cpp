@@ -3,16 +3,60 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
 #include "FindSessionsCallbackProxy.h"
+#include "Interfaces/OnlineIdentityInterface.h"
 #include "OnlineBeaconHost.h"
 #include "OnlineSubsystemUtils.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
 #include "GameFramework/PlayerState.h"
 
+void UOnlineSessionsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogOnline, Error, TEXT("Cannot register session invite handling: Session Interface is not valid."));
+		return;
+	}
+
+	SessionUserInviteAcceptedDelegateHandle = SessionInterface->AddOnSessionUserInviteAcceptedDelegate_Handle(
+		FOnSessionUserInviteAcceptedDelegate::CreateUObject(
+			this, &UOnlineSessionsSubsystem::OnSessionUserInviteAccepted));
+}
+
 IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
 {
 	const IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
 	return Subsystem ? Subsystem->GetSessionInterface() : nullptr;
+}
+
+FString UOnlineSessionsSubsystem::GetPlayerDisplayName(const APlayerState* PlayerState)
+{
+	if (!IsValid(PlayerState))
+	{
+		return FString();
+	}
+
+	const FUniqueNetIdRepl& UniqueId = PlayerState->GetUniqueId();
+	if (UniqueId.GetUniqueNetId().IsValid())
+	{
+		if (const IOnlineSubsystem* Subsystem = Online::GetSubsystem(PlayerState->GetWorld()))
+		{
+			const IOnlineIdentityPtr Identity = Subsystem->GetIdentityInterface();
+			if (Identity.IsValid())
+			{
+				const FString Nickname = Identity->GetPlayerNickname(*UniqueId.GetUniqueNetId());
+				if (!Nickname.IsEmpty())
+				{
+					return Nickname;
+				}
+			}
+		}
+	}
+
+	return PlayerState->GetPlayerName();
 }
 
 void UOnlineSessionsSubsystem::Deinitialize()
@@ -40,6 +84,7 @@ void UOnlineSessionsSubsystem::Deinitialize()
 	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (SessionInterface.IsValid())
 	{
+		SessionInterface->ClearOnSessionUserInviteAcceptedDelegate_Handle(SessionUserInviteAcceptedDelegateHandle);
 		if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
 		{
 			SessionInterface->DestroySession(NAME_GameSession);
@@ -150,14 +195,7 @@ void UOnlineSessionsSubsystem::FindSessionsComplete(bool bWasSuccessful)
 	if (SessionSearch->SearchResults.Num() > 0)
 	{
 		UE_LOG(LogOnline, Log, TEXT("Subsystem found %d sessions"), SessionSearch->SearchResults.Num());
-
-		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
-		JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(
-			FOnJoinSessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnJoinSessionComplete)
-		);
-
-		// Temp: Unirse a la primera sesión encontrada
-		SessionInterface->JoinSession(0, NAME_GameSession, SessionSearch->SearchResults[0]);
+		JoinSessionInternal(0, NAME_GameSession, SessionSearch->SearchResults[0]);
 	}
 	else
 	{
@@ -179,20 +217,12 @@ void UOnlineSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 			FString ConnectString;
 			if (SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 			{
-				FString HostIP = ConnectString;
-				int32 PortIndex = -1;
-				if (HostIP.FindChar(':', PortIndex))
-				{
-					HostIP = HostIP.Left(PortIndex);
-				}
-
-				if (HostIP.IsEmpty() || HostIP == TEXT("0.0.0.0"))
-				{
-					HostIP = TEXT("127.0.0.1");
-				}
-
-				UE_LOG(LogOnline, Log, TEXT("Joined session successfully. Connecting BeaconClient to Host IP: %s:15000..."), *HostIP);
-				ConnectToServer(HostIP, 15000);
+				UE_LOG(LogOnline, Log, TEXT("Joined session successfully. Connecting BeaconClient through the resolved session address."));
+				ConnectToServer(ConnectString, 15000);
+			}
+			else
+			{
+				UE_LOG(LogOnline, Error, TEXT("Joined session, but the session connection address could not be resolved."));
 			}
 		}
 		else
@@ -200,6 +230,22 @@ void UOnlineSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 			UE_LOG(LogOnline, Warning, TEXT("Failed to join session: %s"), *SessionName.ToString());
 		}
 	}
+}
+
+void UOnlineSessionsSubsystem::OnSessionUserInviteAccepted(
+	const bool bWasSuccessful,
+	const int32 LocalUserNum,
+	TSharedPtr<const FUniqueNetId>,
+	const FOnlineSessionSearchResult& InviteResult)
+{
+	if (!bWasSuccessful || !InviteResult.IsValid())
+	{
+		UE_LOG(LogOnline, Warning, TEXT("Steam session invite was accepted without a valid session result."));
+		return;
+	}
+
+	UE_LOG(LogOnline, Log, TEXT("Steam session invite accepted. Joining the invited session."));
+	JoinSessionInternal(LocalUserNum, NAME_GameSession, InviteResult);
 }
 
 void UOnlineSessionsSubsystem::DestroySession()
@@ -248,11 +294,16 @@ void UOnlineSessionsSubsystem::ResetAfterRound()
 void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 {
 	UWorld* World = GetWorld();
-	if (!World) return;
+	if (!World)
+	{
+		UE_LOG(LogOnline, Error, TEXT("Cannot connect to lobby beacon: World is not valid."));
+		return;
+	}
 
 	if (IPAddr.IsEmpty())
 	{
-		IPAddr = TEXT("127.0.0.1");
+		UE_LOG(LogOnline, Error, TEXT("Cannot connect to lobby beacon: resolved session address is empty."));
+		return;
 	}
 
 	if (BeaconClient)
@@ -268,11 +319,11 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 
 		FURL Destination(nullptr, *IPAddr, TRAVEL_Absolute);
 		Destination.Port = Port;
-		UE_LOG(LogOnline, Warning, TEXT("BeaconClient connecting to %s:%d..."), *IPAddr, Destination.Port);
+		UE_LOG(LogOnline, Log, TEXT("BeaconClient connecting through the resolved session address on port %d..."), Destination.Port);
 		
 		if (!BeaconClient->InitClient(Destination))
 		{
-			UE_LOG(LogOnline, Error, TEXT("BeaconClient InitClient FAILED to initialize net driver for destination %s:%d!"), *IPAddr, Destination.Port);
+			UE_LOG(LogOnline, Error, TEXT("BeaconClient InitClient failed to initialize the network driver."));
 		}
 		else
 		{
@@ -287,18 +338,23 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 
 void UOnlineSessionsSubsystem::StartGameLevel(const FString MapAddress)
 {
-	// Por defecto devuelve <IP>:0
+	IOnlineSessionPtr SessionInterface = GetSessionInterface();
+	if (!SessionInterface.IsValid() || !IsValid(LobbyHostObject))
+	{
+		UE_LOG(LogOnline, Error, TEXT("Cannot start the lobby game: Session Interface or LobbyHostObject is not valid."));
+		return;
+	}
+
 	FString URL;
-	GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);
-		
-	FString IP, Port;
-	URL.Split(":", &IP, &Port);
-		
-		
-	// Solución de puerto Hardcodeada
-	const FString GameplayPort = ":7777";
-	URL = IP + GameplayPort;
-		
+	if (!SessionInterface->GetResolvedConnectString(NAME_GameSession, URL))
+	{
+		UE_LOG(LogOnline, Error, TEXT("Cannot start the lobby game: session connection address could not be resolved."));
+		return;
+	}
+
+	FURL GameURL(nullptr, *URL, TRAVEL_Absolute);
+	GameURL.Port = 7777;
+	URL = GameURL.ToString();
 	LobbyHostObject->StartGameForLobby(MapAddress, URL, CachedLobbyPlayers);
 }
 
@@ -349,7 +405,7 @@ void UOnlineSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 					{
 						if (APlayerState* PS = PC->PlayerState)
 						{
-							HostP1.PlayerName = PS->GetPlayerName();
+							HostP1.PlayerName = GetPlayerDisplayName(PS);
 							const FUniqueNetIdRepl& UniqueId = PS->GetUniqueId();
 							if (UniqueId.GetUniqueNetId().IsValid())
 							{
@@ -423,23 +479,36 @@ void UOnlineSessionsSubsystem::ServerTravel(FString Map, bool bIsAbsolute)
 	else
 	{
 		
-		// Por defecto devuelve <IP>:0
+		IOnlineSessionPtr SessionInterface = GetSessionInterface();
+		if (!SessionInterface.IsValid())
+		{
+			UE_LOG(LogOnline, Error, TEXT("Cannot travel from the lobby: Session Interface is not valid."));
+			return;
+		}
+
 		FString URL;
-		GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);
-		
-		FString IP, Port;
-		URL.Split(":", &IP, &Port);
-		
-		
-		// Solución de puerto Hardcodeada
-		const FString GameplayPort = ":7777";
-		URL = IP + GameplayPort;
-		
+		if (!SessionInterface->GetResolvedConnectString(NAME_GameSession, URL))
+		{
+			UE_LOG(LogOnline, Error, TEXT("Cannot travel from the lobby: session connection address could not be resolved."));
+			return;
+		}
+
+		FURL GameURL(nullptr, *URL, TRAVEL_Absolute);
+		GameURL.Port = 7777;
+		URL = GameURL.ToString();
 		LobbyHostObject->StartGameForLobby(Map, URL, CachedLobbyPlayers);
 	}
 }
 
 bool UOnlineSessionsSubsystem::JoinSession(int32 LocalUserNum, FName SessionName, const FBlueprintSessionResult& SearchResult)
+{
+	return JoinSessionInternal(LocalUserNum, SessionName, SearchResult.OnlineResult);
+}
+
+bool UOnlineSessionsSubsystem::JoinSessionInternal(
+	const int32 LocalUserNum,
+	const FName SessionName,
+	const FOnlineSessionSearchResult& SearchResult)
 {
 	IOnlineSessionPtr SessionInterface = GetSessionInterface();
 	if (!SessionInterface.IsValid())
@@ -453,8 +522,14 @@ bool UOnlineSessionsSubsystem::JoinSession(int32 LocalUserNum, FName SessionName
 		FOnJoinSessionCompleteDelegate::CreateUObject(this, &UOnlineSessionsSubsystem::OnJoinSessionComplete)
 	);
 
-	return SessionInterface->JoinSession(LocalUserNum, SessionName, SearchResult.OnlineResult);
-	
+	if (!SessionInterface->JoinSession(LocalUserNum, SessionName, SearchResult))
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+		UE_LOG(LogOnline, Error, TEXT("Online subsystem rejected the request to join session '%s'."), *SessionName.ToString());
+		return false;
+	}
+
+	return true;
 }
 
 void UOnlineSessionsSubsystem::ForceCreateHostBeacon()

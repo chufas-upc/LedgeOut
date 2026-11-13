@@ -1,6 +1,7 @@
 #include "Framework/LobbyBeaconClient.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LedgeOutGameInstance.h"
+#include "Framework/OnlineSessionsSubsystem.h"
 #include "Framework/Lobby/LobbyGameMode.h"
 #include "Framework/SelectionIndexUtils.h"
 #include "GameFramework/PlayerController.h"
@@ -33,7 +34,7 @@ void ALobbyBeaconClient::OnConnected()
 			{
 				if (APlayerState* PS = PC->PlayerState)
 				{
-					DefaultP1.PlayerName = PS->GetPlayerName();
+					DefaultP1.PlayerName = UOnlineSessionsSubsystem::GetPlayerDisplayName(PS);
 					const FUniqueNetIdRepl& UniqueId = PS->GetUniqueId();
 					if (UniqueId.GetUniqueNetId().IsValid())
 					{

@@ -111,7 +111,7 @@ void ALobbyPlayerController::ChangeCharacter(const int32 CharacterIndex, const i
 			NewPlayerData.SelectedCharacterIndex = CharacterIndex;
 			if (PlayerState)
 			{
-				NewPlayerData.PlayerName = PlayerState->GetPlayerName();
+				NewPlayerData.PlayerName = UOnlineSessionsSubsystem::GetPlayerDisplayName(PlayerState);
 				const FUniqueNetIdRepl& UniqueId = PlayerState->GetUniqueId();
 				if (UniqueId.GetUniqueNetId().IsValid())
 				{

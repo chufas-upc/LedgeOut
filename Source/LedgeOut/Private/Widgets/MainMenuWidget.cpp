@@ -33,7 +33,8 @@ void UMainMenuWidget::NativeConstruct()
 	// Retriving Username
 	if (IsValid(GetOwningPlayerState()))
 	{
-		Username_TextBlock->SetText(FText::FromString(GetOwningPlayerState()->GetPlayerName()));
+		Username_TextBlock->SetText(FText::FromString(
+			UOnlineSessionsSubsystem::GetPlayerDisplayName(GetOwningPlayerState())));
 	}
 	else
 	{

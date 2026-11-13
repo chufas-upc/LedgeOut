@@ -13,3 +13,9 @@
    - **Esquina inferior izquierda (Jugador local):** Contador de vidas restantes e indicador del porcentaje de daño acumulado.
    - **Lateral derecho (Tabla de clasificación en vivo):** Lista de rivales ordenada dinámicamente de mayor a menor según cantidad de vidas y menor daño recibido.
    - **Centro superior (Cronómetro):** Temporizador de la ronda (3 a 5 minutos). Al agotarse el tiempo, se activa una fase de **Muerte Súbita (*Sudden Death*)** para forzar el desempate (ej. daño fijado al máximo o reducción del área de combate).
+
+## Steam (pruebas)
+- El proyecto usa Steam como Online Subsystem y Steam Sockets para el transporte de sesiones y beacons.
+- `SteamDevAppId=480` habilita las pruebas con Spacewar; para las invitaciones, ambos jugadores deben ejecutar el juego con Steam iniciado.
+- Las invitaciones aceptadas se unen a la sesión Steam y conectan al beacon con la dirección resuelta por Online Subsystem, sin solicitar ni compartir una IP manualmente.
+- Para partidas en LAN, activa la opción LAN del menú; las sesiones normales usan Steam Presence.
