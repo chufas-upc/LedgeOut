@@ -1,6 +1,7 @@
 #include "Framework/LedgeOutPlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Framework/LedgeOutPlayerState.h"
 #include "InputMappingContext.h"
 #include "Widgets/GameWidget.h"
 
@@ -35,6 +36,7 @@ void ALedgeOutPlayerController::SetupInputComponent()
 		if (GameWidget)
 		{
 			GameWidget->AddToPlayerScreen();
+			BindGameWidgetToPlayerState();
 		}
 	}
 }
@@ -45,5 +47,19 @@ void ALedgeOutPlayerController::AcknowledgePossession(APawn* P)
 	if (GameWidget)
 	{
 		GameWidget->BindPawn(P);
+	}
+}
+
+void ALedgeOutPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	BindGameWidgetToPlayerState();
+}
+
+void ALedgeOutPlayerController::BindGameWidgetToPlayerState()
+{
+	if (GameWidget)
+	{
+		GameWidget->BindPlayerState(GetPlayerState<ALedgeOutPlayerState>());
 	}
 }

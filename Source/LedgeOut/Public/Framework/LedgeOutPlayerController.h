@@ -33,10 +33,14 @@ protected:
 
 public:
 	virtual void AcknowledgePossession(APawn* P) override;
+	virtual void OnRep_PlayerState() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category ="Widgets")
 	TSubclassOf<UGameWidget> GameWidgetClass;
 	
 	UPROPERTY(BlueprintReadOnly, Category ="Widgets")
 	TObjectPtr<UGameWidget> GameWidget;
+
+private:
+	void BindGameWidgetToPlayerState();
 };

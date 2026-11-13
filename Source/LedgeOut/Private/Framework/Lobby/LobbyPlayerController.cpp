@@ -5,17 +5,9 @@
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/OnlineSessionsSubsystem.h"
 #include "Framework/LobbyPlayerData.h"
+#include "Framework/SelectionIndexUtils.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
-
-namespace
-{
-	int32 WrapSelectionIndex(const int32 CurrentIndex, const int32 Direction, const int32 OptionCount)
-	{
-		const int32 NormalizedIndex = ((CurrentIndex % OptionCount) + OptionCount) % OptionCount;
-		return (NormalizedIndex + Direction + OptionCount) % OptionCount;
-	}
-}
 
 ALobbyPlayerController::ALobbyPlayerController()
 {
