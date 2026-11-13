@@ -7,6 +7,7 @@
 #include "OnlineSubsystemUtils.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
+#include "Framework/LedgeOutGameInstance.h"
 #include "GameFramework/PlayerState.h"
 
 IOnlineSessionPtr UOnlineSessionsSubsystem::GetSessionInterface() const
@@ -277,6 +278,13 @@ void UOnlineSessionsSubsystem::ConnectToServer(FString IPAddr, int32 Port)
 
 void UOnlineSessionsSubsystem::StartGameLevel(const FString MapAddress)
 {
+	// Store final lobby selections into the GameInstance before travelling
+	if (ULedgeOutGameInstance* GI = Cast<ULedgeOutGameInstance>(GetGameInstance()))
+	{
+		GI->FinalLobbySelections = CachedLobbyPlayers;
+		UE_LOG(LogOnline, Log, TEXT("StartGameLevel: Saved %d player selections to GameInstance."), CachedLobbyPlayers.Num());
+	}
+
 	// Por defecto devuelve <IP>:0
 	FString URL;
 	GetSessionInterface()->GetResolvedConnectString(NAME_GameSession, URL);

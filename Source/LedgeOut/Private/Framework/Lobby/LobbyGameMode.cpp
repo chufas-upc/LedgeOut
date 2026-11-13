@@ -31,7 +31,28 @@ void ALobbyGameMode::OnPostLogin(AController* NewPlayer)
 	}
 }
 
-FString ALobbyGameMode::GetCharacterNameByIndex(const int32 Index)
+TSoftObjectPtr<USkeletalMesh> ALobbyGameMode::GetCharacterMeshSoft(const int32 Index) const
 {
-	return !CharacterNames.IsValidIndex(Index) ? CharacterNames[Index] : "NO VALID";
+	if (AvailableCharacters.IsValidIndex(Index))
+	{
+		return AvailableCharacters[Index].SkeletalMesh;
+	}
+	return TSoftObjectPtr<USkeletalMesh>();
+}
+
+int32 ALobbyGameMode::GetSkinCount(const int32 CharacterIndex) const
+{
+	return AvailableCharacters.IsValidIndex(CharacterIndex)
+		? AvailableCharacters[CharacterIndex].AvailableSkins.Num()
+		: 0;
+}
+
+TSoftObjectPtr<USkeletalMesh> ALobbyGameMode::GetSkinMeshSoft(const int32 CharacterIndex, const int32 SkinIndex) const
+{
+	if (AvailableCharacters.IsValidIndex(CharacterIndex)
+		&& AvailableCharacters[CharacterIndex].AvailableSkins.IsValidIndex(SkinIndex))
+	{
+		return AvailableCharacters[CharacterIndex].AvailableSkins[SkinIndex].SkeletalMesh;
+	}
+	return TSoftObjectPtr<USkeletalMesh>();
 }

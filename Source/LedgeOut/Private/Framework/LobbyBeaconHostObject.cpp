@@ -1,5 +1,7 @@
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/LobbyBeaconClient.h"
+#include "Framework/Lobby/LobbyGameMode.h"
+#include "Kismet/GameplayStatics.h"
 #include "OnlineSubsystem.h"
 
 ALobbyBeaconHostObject::ALobbyBeaconHostObject()
@@ -91,14 +93,32 @@ void ALobbyBeaconHostObject::UpdateHostLocalPlayerData(int32 LocalPlayerIndex, c
 void ALobbyBeaconHostObject::BroadcastLobbyState()
 {
 	TArray<FLobbyPlayerData> FullPlayerList;
+	const ALobbyGameMode* LobbyGameMode = Cast<ALobbyGameMode>(UGameplayStatics::GetGameMode(this));
+
+	const auto AppendPlayersWithCharacterPaths = [LobbyGameMode, &FullPlayerList](const TArray<FLobbyPlayerData>& Players)
+	{
+		for (FLobbyPlayerData Player : Players)
+		{
+			Player.SelectedCharacterMeshPath.Reset();
+			Player.SelectedSkinMeshPath.Reset();
+			if (IsValid(LobbyGameMode))
+			{
+				Player.SelectedCharacterMeshPath = LobbyGameMode->GetCharacterMeshSoft(
+					Player.SelectedCharacterIndex).ToSoftObjectPath().ToString();
+				Player.SelectedSkinMeshPath = LobbyGameMode->GetSkinMeshSoft(
+					Player.SelectedCharacterIndex, Player.SelectedSkinIndex).ToSoftObjectPath().ToString();
+			}
+			FullPlayerList.Add(MoveTemp(Player));
+		}
+	};
 
 	// 1. Include the host's local players
-	FullPlayerList.Append(HostLocalPlayers);
+	AppendPlayersWithCharacterPaths(HostLocalPlayers);
 
 	// 2. Include all connected client players
 	for (const auto& Pair : ConnectedPlayersMap)
 	{
-		FullPlayerList.Append(Pair.Value);
+		AppendPlayersWithCharacterPaths(Pair.Value);
 	}
 
 	// 3. Replicate update to all connected clients
@@ -107,6 +127,21 @@ void ALobbyBeaconHostObject::BroadcastLobbyState()
 		if (Pair.Key)
 		{
 			Pair.Key->ClientUpdateLobbyList(FullPlayerList);
+
+			TArray<FLobbyPlayerData> ClientPlayers = Pair.Value;
+			for (FLobbyPlayerData& Player : ClientPlayers)
+			{
+				Player.SelectedCharacterMeshPath.Reset();
+				Player.SelectedSkinMeshPath.Reset();
+				if (IsValid(LobbyGameMode))
+				{
+					Player.SelectedCharacterMeshPath = LobbyGameMode->GetCharacterMeshSoft(
+						Player.SelectedCharacterIndex).ToSoftObjectPath().ToString();
+					Player.SelectedSkinMeshPath = LobbyGameMode->GetSkinMeshSoft(
+						Player.SelectedCharacterIndex, Player.SelectedSkinIndex).ToSoftObjectPath().ToString();
+				}
+			}
+			Pair.Key->ClientUpdateLocalPlayers(ClientPlayers);
 		}
 	}
 

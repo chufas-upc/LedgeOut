@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Framework/LobbyPlayerData.h"
 #include "GameFramework/Actor.h"
+#include "Engine/StreamableManager.h"
 #include "CharacterSelector.generated.h"
 
 struct FLobbyPlayerData;
@@ -49,6 +50,24 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Lobby")
 	void OnSlotOccupiedStateChanged(bool bOccupied, const FLobbyPlayerData& OccupyingPlayerData);
 	virtual void OnSlotOccupiedStateChanged_Implementation(bool bOccupied, const FLobbyPlayerData& OccupyingPlayerData);
+
+	/** Async-load the skeletal mesh supplied by the lobby host */
+	void AsyncLoadCharacterMesh(const FString& CharacterMeshPath);
+
+	/** Called when the async load completes */
+	void OnCharacterMeshLoaded(TSoftObjectPtr<USkeletalMesh> SoftMesh);
+
+	/** Cancel any in-flight streaming request */
+	void CancelPendingMeshLoad();
+
+private:
+	/** Handle to cancel in-flight async load requests */
+	TSharedPtr<FStreamableHandle> StreamableHandle;
+
+	/** Index that was last requested to load (to discard stale callbacks) */
+	int32 LastRequestedCharacterIndex = INDEX_NONE;
+
+	FString LastRequestedMeshPath;
 
 public:
 	UFUNCTION(BlueprintCallable)

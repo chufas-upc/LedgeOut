@@ -45,12 +45,32 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
 	void ToggleAllLocalPlayersReady();
 
+	/**
+	 * Change the selected character for a specific local player on this machine.
+	 * @param LocalPlayerIndex  Which local player (0 = P1, 1 = P2 splitscreen, …)
+	 * @param CharacterIndex    Index into ALobbyGameMode::AvailableCharacters
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void SetLocalPlayerCharacter(int32 LocalPlayerIndex, int32 CharacterIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void StepLocalPlayerCharacter(int32 LocalPlayerIndex, int32 Direction);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void SetLocalPlayerSkin(int32 LocalPlayerIndex, int32 SkinIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
+	void StepLocalPlayerSkin(int32 LocalPlayerIndex, int32 Direction);
+
 	// Send current local players array to host
 	UFUNCTION(BlueprintCallable, Category = "Lobby Beacon")
 	void SendLocalPlayersToHost();
 
 	UFUNCTION(Client, Reliable)
 	void ClientUpdateLobbyList(const TArray<FLobbyPlayerData>& PlayerList);
+
+	UFUNCTION(Client, Reliable)
+	void ClientUpdateLocalPlayers(const TArray<FLobbyPlayerData>& LocalPlayers);
 
 	UFUNCTION(Client, Reliable)
 	void ClientGameStarting(const FString& ConnectURL);
@@ -61,6 +81,21 @@ public:
 protected:
 	UFUNCTION(Server, Reliable)
 	void ServerUpdateLocalPlayers(const TArray<FLobbyPlayerData>& LocalPlayers);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetLocalPlayerCharacter(int32 LocalPlayerIndex, int32 CharacterIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStepLocalPlayerCharacter(int32 LocalPlayerIndex, int32 Direction);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetLocalPlayerSkin(int32 LocalPlayerIndex, int32 SkinIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStepLocalPlayerSkin(int32 LocalPlayerIndex, int32 Direction);
+
+private:
+	void PublishLocalPlayersToHost();
 
 	UPROPERTY()
 	TArray<FLobbyPlayerData> MyLocalPlayers;
