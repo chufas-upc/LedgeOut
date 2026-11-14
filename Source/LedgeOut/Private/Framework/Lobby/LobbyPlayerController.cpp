@@ -1,17 +1,157 @@
 ﻿#include "Framework/Lobby/LobbyPlayerController.h"
 #include "Camera/CameraActor.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
 #include "Framework/Lobby/LobbyGameMode.h"
 #include "Framework/LobbyBeaconClient.h"
 #include "Framework/LobbyBeaconHostObject.h"
 #include "Framework/OnlineSessionsSubsystem.h"
 #include "Framework/LobbyPlayerData.h"
 #include "Framework/SelectionIndexUtils.h"
+#include "InputAction.h"
+#include "InputCoreTypes.h"
+#include "InputMappingContext.h"
 #include "GameFramework/PlayerState.h"
+#include "Engine/LocalPlayer.h"
 #include "Kismet/GameplayStatics.h"
 
 ALobbyPlayerController::ALobbyPlayerController()
 {
 	bAutoManageActiveCameraTarget = false;
+}
+
+void ALobbyPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (!IsLocalController() || !IsPrimaryPlayer())
+	{
+		return;
+	}
+
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+	if (!EnhancedInputComponent)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Lobby selection input requires an Enhanced Input component."));
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer
+		? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer)
+		: nullptr;
+	if (!InputSubsystem)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Lobby selection input requires a local Enhanced Input subsystem."));
+		return;
+	}
+
+	LobbySelectionMappingContext = NewObject<UInputMappingContext>(this, TEXT("LobbySelectionMappingContext"));
+	PreviousCharacterAction = NewObject<UInputAction>(this, TEXT("PreviousCharacterAction"));
+	NextCharacterAction = NewObject<UInputAction>(this, TEXT("NextCharacterAction"));
+	PreviousSkinAction = NewObject<UInputAction>(this, TEXT("PreviousSkinAction"));
+	NextSkinAction = NewObject<UInputAction>(this, TEXT("NextSkinAction"));
+
+	PreviousCharacterAction->ValueType = EInputActionValueType::Boolean;
+	NextCharacterAction->ValueType = EInputActionValueType::Boolean;
+	PreviousSkinAction->ValueType = EInputActionValueType::Boolean;
+	NextSkinAction->ValueType = EInputActionValueType::Boolean;
+
+	LobbySelectionMappingContext->MapKey(PreviousCharacterAction, EKeys::Left);
+	LobbySelectionMappingContext->MapKey(NextCharacterAction, EKeys::Right);
+	LobbySelectionMappingContext->MapKey(PreviousSkinAction, EKeys::Down);
+	LobbySelectionMappingContext->MapKey(NextSkinAction, EKeys::Up);
+
+	if (bLobbySelectionInputEnabled)
+	{
+		InputSubsystem->AddMappingContext(LobbySelectionMappingContext, 1);
+	}
+
+	EnhancedInputComponent->BindAction(
+		PreviousCharacterAction, ETriggerEvent::Started, this, &ALobbyPlayerController::OnPreviousCharacterInput);
+	EnhancedInputComponent->BindAction(
+		NextCharacterAction, ETriggerEvent::Started, this, &ALobbyPlayerController::OnNextCharacterInput);
+	EnhancedInputComponent->BindAction(
+		PreviousSkinAction, ETriggerEvent::Started, this, &ALobbyPlayerController::OnPreviousSkinInput);
+	EnhancedInputComponent->BindAction(
+		NextSkinAction, ETriggerEvent::Started, this, &ALobbyPlayerController::OnNextSkinInput);
+}
+
+void ALobbyPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UOnlineSessionsSubsystem* SessionsSubsystem = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UOnlineSessionsSubsystem>()
+		: nullptr)
+	{
+		SessionsSubsystem->OnConnectionChanged.RemoveDynamic(
+			this, &ALobbyPlayerController::OnLobbyConnectionChanged);
+	}
+
+	if (LobbySelectionMappingContext)
+	{
+		if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
+		{
+			if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
+				ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
+			{
+				InputSubsystem->RemoveMappingContext(LobbySelectionMappingContext);
+			}
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void ALobbyPlayerController::OnLobbyConnectionChanged(const ELobbyStatus Status)
+{
+	SetLobbySelectionInputEnabled(Status != ELobbyStatus::Disconnected);
+}
+
+void ALobbyPlayerController::SetLobbySelectionInputEnabled(const bool bEnabled)
+{
+	bLobbySelectionInputEnabled = bEnabled;
+	if (!LobbySelectionMappingContext)
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LocalPlayer
+		? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer)
+		: nullptr;
+	if (!InputSubsystem)
+	{
+		return;
+	}
+
+	if (bEnabled)
+	{
+		InputSubsystem->AddMappingContext(LobbySelectionMappingContext, 1);
+	}
+	else
+	{
+		InputSubsystem->RemoveMappingContext(LobbySelectionMappingContext);
+	}
+}
+
+void ALobbyPlayerController::OnPreviousCharacterInput()
+{
+	SelectPreviousCharacter();
+}
+
+void ALobbyPlayerController::OnNextCharacterInput()
+{
+	SelectNextCharacter();
+}
+
+void ALobbyPlayerController::OnPreviousSkinInput()
+{
+	SelectPreviousSkin();
+}
+
+void ALobbyPlayerController::OnNextSkinInput()
+{
+	SelectNextSkin();
 }
 
 ACameraActor* ALobbyPlayerController::FindCameraByTag(const FName Tag) const
@@ -28,6 +168,17 @@ ACameraActor* ALobbyPlayerController::FindCameraByTag(const FName Tag) const
 void ALobbyPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (UOnlineSessionsSubsystem* SessionsSubsystem = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UOnlineSessionsSubsystem>()
+		: nullptr)
+	{
+		SessionsSubsystem->OnConnectionChanged.AddUniqueDynamic(
+			this, &ALobbyPlayerController::OnLobbyConnectionChanged);
+		SetLobbySelectionInputEnabled(
+			IsValid(SessionsSubsystem->LobbyHostObject) || IsValid(SessionsSubsystem->BeaconClient));
+	}
+
 	// if (!HasAuthority()) return;
 	// Primary Player Only 
 	if (!IsLocalController() || !IsPrimaryPlayer()) return;

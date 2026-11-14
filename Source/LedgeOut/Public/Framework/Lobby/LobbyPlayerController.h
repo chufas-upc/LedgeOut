@@ -2,7 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Framework/LobbyPlayerData.h"
 #include "LobbyPlayerController.generated.h"
+
+class UInputAction;
+class UInputMappingContext;
 
 /**
  * 
@@ -17,6 +21,8 @@ class LEDGEOUT_API ALobbyPlayerController : public APlayerController
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void SetupInputComponent() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	
@@ -47,4 +53,30 @@ public:
 private:
 	void StepCharacterSelection(int32 Direction, int32 LocalPlayerIndex);
 	void StepSkinSelection(int32 Direction, int32 LocalPlayerIndex);
+	void OnPreviousCharacterInput();
+	void OnNextCharacterInput();
+	void OnPreviousSkinInput();
+	void OnNextSkinInput();
+
+	UFUNCTION()
+	void OnLobbyConnectionChanged(ELobbyStatus Status);
+
+	void SetLobbySelectionInputEnabled(bool bEnabled);
+
+	bool bLobbySelectionInputEnabled = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputMappingContext> LobbySelectionMappingContext;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PreviousCharacterAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> NextCharacterAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PreviousSkinAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> NextSkinAction;
 };
